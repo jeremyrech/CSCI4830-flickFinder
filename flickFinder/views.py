@@ -22,7 +22,9 @@ def home(request):
     filter_form = FilterForm(instance=user_filters) if user_filters else FilterForm()
     
     # Get the first movie for display (if available)
-    current_movie = get_next_unwatched_movie(request.user, user_filters)
+    current_movie = None
+    if request.user.is_authenticated:
+        current_movie = get_next_unwatched_movie(request.user, user_filters)
     
     if current_movie:
         # Store in our database
