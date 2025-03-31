@@ -110,6 +110,8 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
+USE_L10N = True
+
 USE_TZ = True
 
 
@@ -117,20 +119,20 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'flickFinder' / 'static',
 ]
 
 # Media files settings
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+#MEDIA_URL = '/media/'
+#MEDIA_ROOT = BASE_DIR / 'media'
+
+#TMDB
+TMDB_API_KEY = 'c9dababb5ed8cf9eebe65b78ac89a7b8'
 
 # User authentication settings
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'info'
-LOGOUT_REDIRECT_URL = 'home'
-
+LOGIN_URL = '/login/'
+LOGOUT_REDIRECT_URL = "/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

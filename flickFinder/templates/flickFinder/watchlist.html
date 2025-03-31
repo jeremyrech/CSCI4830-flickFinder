@@ -1,0 +1,111 @@
+{% extends 'flickFinder/base.html' %}
+
+{% block title %}My Watchlist - FlickFinder{% endblock %}
+
+{% block extra_css %}
+<style>
+    .watchlist-header {
+        margin-bottom: 30px;
+    }
+    
+    .movie-card {
+        margin-bottom: 20px;
+        transition: transform 0.3s;
+        height: 100%;
+    }
+    
+    .movie-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .movie-poster {
+        width: 100%;
+        height: 300px;
+        object-fit: cover;
+        border-radius: 5px 5px 0 0;
+    }
+    
+    .movie-info {
+        padding: 15px;
+    }
+    
+    .movie-title {
+        font-weight: 600;
+        margin-bottom: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .empty-watchlist {
+        text-align: center;
+        padding: 100px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="watchlist-header">
+    <h1>My Watchlist</h1>
+    <p>Movies you want to watch</p>
+</div>
+
+{% if watchlist %}
+<div class="row">
+    {% for item in watchlist %}
+    <div class="col-md-3 col-sm-6">
+        <div class="card movie-card">
+            <a href="{% url 'movie_detail' item.movie.tmdb_id %}">
+                <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}" 
+                     alt="{{ item.movie.title }}" class="movie-poster">
+            </a>
+            <div class="movie-info">
+                <h5 class="movie-title" title="{{ item.movie.title }}">{{ item.movie.title }}</h5>
+                <p class="text-muted">Added on {{ item.timestamp|date:"M d, Y" }}</p>
+                <button class="btn btn-sm btn-outline-danger remove-btn" 
+                        data-movie-id="{{ item.movie.tmdb_id }}">
+                    Remove
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-watchlist">
+    <h3>Your watchlist is empty</h3>
+    <p>Start exploring movies to add them to your watchlist</p>
+    <a href="{% url 'home' %}" class="btn btn-primary">Discover Movies</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle remove from watchlist
+        $('.remove-btn').click(function() {
+            const movieId = $(this).data('movie-id');
+            
+            // hate ajax hate ajax hate ajax hate ajax
+            $.ajax({
+                url: '{% url "movie_interaction" %}',
+                type: 'POST',
+                data: {
+                    'movie_id': movieId,
+                    'interaction_type': 'unwatchlist',
+                    'csrfmiddlewaretoken': '{{ csrf_token }}'
+                },
+                success: function() {
+                    $(this).remove();
+                    // Reload the page to refresh the watchlist
+                    location.reload();
+                },
+                error: function() {
+                    alert('An error occurred. Please try again.');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

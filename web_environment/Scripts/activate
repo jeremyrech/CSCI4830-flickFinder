@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\Jeremy\Desktop\CSCI4480\web_environment"
+VIRTUAL_ENV="C:\Users\Jeremy\desktop\project\CSCI4830-flickFinder\web_environment"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

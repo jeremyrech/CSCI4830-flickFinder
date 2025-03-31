@@ -1,0 +1,221 @@
+{% extends 'flickFinder/base.html' %}
+
+{% block title %}{{ movie.title }} - FlickFinder{% endblock %}
+
+{% block extra_css %}
+<style>
+    .movie-backdrop {
+        height: 300px;
+        background-size: cover;
+        background-position: center;
+        position: relative;
+    }
+    
+    .movie-backdrop::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.8));
+    }
+    
+    .movie-poster-container {
+        margin-top: -150px;
+        position: relative;
+        z-index: 10;
+    }
+    
+    .movie-poster {
+        width: 100%;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    
+    .movie-details {
+        color: rgb(0, 0, 0);
+        position: relative;
+        z-index: 10;
+        padding-left: 20px;
+    }
+    
+    .movie-title {
+        font-size: 32px;
+        margin-bottom: 10px;
+    }
+    
+    .movie-meta {
+        margin-bottom: 15px;
+    }
+    
+    .movie-actions {
+        margin-top: 20px;
+    }
+    
+    .section-heading {
+        margin-top: 30px;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #000000;
+        padding-bottom: 10px;
+    }
+    
+    .genre-badge {
+        background-color: #e9ecef;
+        color: #495057;
+        padding: 5px 10px;
+        border-radius: 15px;
+        margin-right: 5px;
+        margin-bottom: 5px;
+        display: inline-block;
+    }
+    
+    @media (max-width: 767px) {
+        .movie-poster-container {
+            margin-top: -100px;
+            margin-bottom: 20px;
+        }
+        
+        .movie-details {
+            color: #212529;
+            padding-left: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Movie Backdrop -->
+<div class="movie-backdrop mb-4" 
+     style="background-image: url('https://image.tmdb.org/t/p/w1280{{ movie.backdrop_path }}');">
+</div>
+
+<div class="container">
+    <div class="row">
+        <!-- Movie Poster -->
+        <div class="col-md-4 movie-poster-container">
+            <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
+                 alt="{{ movie.title }}" class="movie-poster">
+                 
+            <!-- Movie Actions (only shown for authenticated users) -->
+            {% if user.is_authenticated %}
+            <div class="movie-actions d-grid gap-2 mt-3">
+                {% if user_interaction and user_interaction.interaction_type == 'heart' %}
+                <button class="btn btn-danger" data-action="unheart" data-movie-id="{{ movie.id }}">
+                    <i class="fas fa-heart"></i> Remove from Favorites
+                </button>
+                {% else %}
+                <button class="btn btn-outline-danger" data-action="heart" data-movie-id="{{ movie.id }}">
+                    <i class="far fa-heart"></i> Add to Favorites
+                </button>
+                {% endif %}
+                
+                {% if user_interaction and user_interaction.interaction_type == 'watchlist' %}
+                <button class="btn btn-success" data-action="unwatchlist" data-movie-id="{{ movie.id }}">
+                    <i class="fas fa-check"></i> In Your Watchlist
+                </button>
+                {% else %}
+                <button class="btn btn-outline-success" data-action="watchlist" data-movie-id="{{ movie.id }}">
+                    <i class="fas fa-plus"></i> Add to Watchlist
+                </button>
+                {% endif %}
+                
+                {% if user_interaction and user_interaction.interaction_type == 'block' %}
+                <button class="btn btn-warning" data-action="unblock" data-movie-id="{{ movie.id }}">
+                    <i class="fas fa-ban"></i> Unblock Movie
+                </button>
+                {% else %}
+                <button class="btn btn-outline-warning" data-action="block" data-movie-id="{{ movie.id }}">
+                    <i class="fas fa-ban"></i> Block for 3 Days
+                </button>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="alert alert-info mt-3">
+                <a href="{% url 'login' %}">Login</a> to add this movie to your watchlist or favorites.
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Movie Details -->
+        <div class="col-md-8 movie-details">
+            <h1 class="movie-title">{{ movie.title }}</h1>
+            
+            <div class="movie-meta">
+                <span>{{ movie.release_date|date:"Y" }}</span> • 
+                <span>{{ movie.runtime }} min</span> • 
+                <span>{{ movie.vote_average }}/10 ({{ movie.vote_count }} votes)</span>
+            </div>
+            
+            {% if movie.tagline %}
+            <p class="fst-italic">{{ movie.tagline }}</p>
+            {% endif %}
+            
+            <h4 class="section-heading">Overview</h4>
+            <p>{{ movie.overview }}</p>
+            
+            {% if movie.genres %}
+            <h4 class="section-heading">Genres</h4>
+            <div>
+                {% for genre in movie.genres %}
+                <span class="genre-badge">{{ genre.name }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <!-- I don't think the movie.credits is ever there, I'll fix later -->
+            {% if movie.credits %}
+            <h4 class="section-heading">Cast</h4>
+            <div class="row">
+                {% for cast in movie.credits.cast|slice:":6" %}
+                <div class="col-md-4 col-6 mb-3">
+                    <div class="d-flex align-items-center">
+                        {% if cast.profile_path %}
+                        <img src="https://image.tmdb.org/t/p/w45{{ cast.profile_path }}" 
+                             alt="{{ cast.name }}" class="rounded-circle me-2" width="45">
+                        {% else %}
+                        <div class="rounded-circle bg-secondary me-2" style="width: 45px; height: 45px;"></div>
+                        {% endif %}
+                        <div>
+                            <div>{{ cast.name }}</div>
+                            <small class="text-muted">{{ cast.character }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle movie interactions
+        // probably should move this to the main.js and import to share between this and index
+        $('.movie-actions button').click(function() {
+            const movieId = $(this).data('movie-id');
+            const action = $(this).data('action');
+            
+            $.ajax({
+                url: '{% url "movie_interaction" %}',
+                type: 'POST',
+                data: {
+                    'movie_id': movieId,
+                    'interaction_type': action.replace('un', ''),
+                    'csrfmiddlewaretoken': '{{ csrf_token }}'
+                },
+                success: function() {
+                    // Reload the page to refresh the UI
+                    location.reload();
+                },
+                error: function() {
+                    alert('An error occurred. Please try again.');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,265 @@
+{% extends 'flickFinder/base.html' %}
+{% load static %}
+
+{% block title %}FlickFinder - Discover Movies{% endblock %}
+
+{% block extra_css %}
+<style>
+    .movie-card {
+        position: relative;
+        height: 80vh;
+        max-height: 600px;
+        overflow: hidden;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .movie-poster {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .movie-info {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.8));
+        padding: 20px;
+        color: white;
+    }
+    
+    .movie-actions {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 20px;
+    }
+    
+    .action-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        transition: all 0.3s;
+    }
+    
+    .action-btn:hover {
+        transform: scale(1.1);
+    }
+    
+    .filters-panel {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .no-movies {
+        text-align: center;
+        padding: 100px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="d-flex justify-content-between mb-3">
+            <h2>Discover Movies</h2>
+            <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#filtersModal">
+                <i class="fas fa-filter"></i> Filters
+            </button>
+        </div>
+        
+        {% if movie %}
+        <div id="movieContainer" class="movie-card">
+            <a href="{% url 'movie_detail' movie.id %}">
+                <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
+                     alt="{{ movie.title }}" class="movie-poster">
+            </a>
+            <div class="movie-info">
+                <h3>{{ movie.title }}</h3>
+                <p>{{ movie.release_date|slice:"0:4" }} | {{ movie.vote_average }}/10</p>
+                <p class="movie-overview">{{ movie.overview|truncatechars:150 }}</p>
+            </div>
+        </div>
+        
+        <div class="movie-actions">
+            <button class="action-btn btn btn-light" data-action="skip" data-movie-id="{{ movie.id }}">
+                <i class="fas fa-times text-danger"></i>
+            </button>
+            <button class="action-btn btn btn-light" data-action="block" data-movie-id="{{ movie.id }}">
+                <i class="fas fa-ban text-warning"></i>
+            </button>
+            <button class="action-btn btn btn-light" data-action="heart" data-movie-id="{{ movie.id }}">
+                <i class="fas fa-heart text-danger"></i>
+            </button>
+            <button class="action-btn btn btn-light" data-action="watchlist" data-movie-id="{{ movie.id }}">
+                <i class="fas fa-plus text-success"></i>
+            </button>
+        </div>
+        {% else %}
+        <div class="no-movies">
+            <h3>No movies found</h3>
+            <p>Try adjusting your filters or check back later.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Filters Modal -->
+<!-- most of this genre id stuff does not work -->
+<div class="modal fade" id="filtersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Filter Movies</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="filterForm" method="post" action="{% url 'save_filters' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Genres</label>
+                        <div class="row">
+                            {% for genre_id, genre_name in filter_form.genre_ids.field.widget.choices %}
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="genre_ids" 
+                                           value="{{ genre_id }}" id="genre_{{ genre_id }}"
+                                           {% if genre_id in filter_form.genre_ids.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="genre_{{ genre_id }}">
+                                        {{ genre_name }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_min_release_year" class="form-label">Min Year</label>
+                                <input type="number" class="form-control" id="id_min_release_year" 
+                                       name="min_release_year" min="1900" max="2030"
+                                       value="{{ filter_form.min_release_year.value|default_if_none:'' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="id_max_release_year" class="form-label">Max Year</label>
+                                <input type="number" class="form-control" id="id_max_release_year" 
+                                       name="max_release_year" min="1900" max="2030"
+                                       value="{{ filter_form.max_release_year.value|default_if_none:'' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_min_rating" class="form-label">Minimum Rating</label>
+                        <input type="number" class="form-control" id="id_min_rating" 
+                               name="min_rating" min="0" max="10" step="0.5"
+                               value="{{ filter_form.min_rating.value|default_if_none:'' }}">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveFilters">Apply Filters</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle movie interactions (heart, block, watchlist, skip)
+        $('.action-btn').click(function() {
+            const movieId = $(this).data('movie-id');
+            const action = $(this).data('action');
+            
+            $.ajax({
+                url: '{% url "movie_interaction" %}',
+                type: 'POST',
+                data: {
+                    'movie_id': movieId,
+                    'interaction_type': action,
+                    'csrfmiddlewaretoken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // Update the UI with the next movie
+                        updateMovieDisplay(response.next_movie);
+                    } else if (response.status === 'no_more_movies') {
+                        // Show a message when no more movies are available
+                        $('#movieContainer').html('<div class="no-movies"><h3>No more movies</h3><p>' + 
+                                                 response.message + '</p></div>');
+                        $('.movie-actions').hide();
+                    }
+                },
+                error: function() {
+                    alert('An error occurred. Please try again.');
+                }
+            });
+        });
+        
+        // Handle filter form submission
+        $('#saveFilters').click(function() {
+            $.ajax({
+                url: '{% url "save_filters" %}',
+                type: 'POST',
+                data: $('#filterForm').serialize(),
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // Close the modal and refresh the page to load new movies
+                        $('#filtersModal').modal('hide');
+                        location.reload();
+                    } else {
+                        // Show validation errors
+                        alert('Please correct the errors in the form.');
+                    }
+                },
+                error: function() {
+                    alert('An error occurred. Please try again.');
+                }
+            });
+        });
+        
+        // Function to update the movie display with new movie data
+        function updateMovieDisplay(movie) {
+            if (!movie) return;
+            
+            const posterUrl = movie.poster_path ? 
+                `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 
+                '{% static "flickFinder/images/no-poster.jpg" %}';
+                // add this later
+                
+            const releaseYear = movie.release_date ? 
+                new Date(movie.release_date).getFullYear() : 'N/A';
+                
+            const movieHtml = `
+                <a href="/movie/${movie.id}/">
+                    <img src="${posterUrl}" alt="${movie.title}" class="movie-poster">
+                </a>
+                <div class="movie-info">
+                    <h3>${movie.title}</h3>
+                    <p>${releaseYear} | ${movie.vote_average}/10</p>
+                    <p class="movie-overview">${movie.overview ? movie.overview.substring(0, 150) + '...' : ''}</p>
+                </div>
+            `;
+            
+            $('#movieContainer').html(movieHtml);
+            
+            // Update action buttons with new movie ID
+            $('.action-btn').data('movie-id', movie.id);
+        }
+    });
+</script>
+{% endblock %}
