@@ -28,13 +28,11 @@ class TMDBService:
     
     def discover_movies(self, filters=None, page=1):
         """Gets list of movies based on filters"""
-        # I don't think this is actually functional for genre IDs, year works though
         params = {'page': page}
         
         if filters:
             if filters.genre_ids:
-                # I think this is bad and wrong
-                params['with_genres'] = ','.join(map(str, filters.genre_ids))
+                params['with_genres'] = ','.join(filters.genre_ids)
             
             if filters.min_release_year:
                 params['primary_release_date.gte'] = f"{filters.min_release_year}-01-01"
