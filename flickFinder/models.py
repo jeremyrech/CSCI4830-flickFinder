@@ -43,8 +43,7 @@ class UserMovieInteraction(models.Model):
 
 class UserFilter(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    genre_ids = models.CharField(max_length=255, blank=True, null=True)  # Comma-separated genre IDs
-    # Also I don't think the genre ids work yet, I'll work on it
+    genre_ids = models.JSONField(blank=True, null=True) # Comma-separated genre IDs
     min_release_year = models.IntegerField(null=True, blank=True)
     max_release_year = models.IntegerField(null=True, blank=True)
     min_rating = models.FloatField(null=True, blank=True)
