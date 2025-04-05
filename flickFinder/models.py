@@ -23,7 +23,8 @@ class UserMovieInteraction(models.Model):
         ('heart', 'Hearted'),
         ('block', 'Blocked'),
         ('watchlist', 'Added to Watchlist'),
-        ('skip', 'Skipped')
+        ('skip', 'Skipped'),
+        ('unwatch', 'Unwatched')
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE)

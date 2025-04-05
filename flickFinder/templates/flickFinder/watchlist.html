@@ -85,23 +85,38 @@
     $(document).ready(function() {
         // Handle remove from watchlist
         $('.remove-btn').click(function() {
+            const $card = $(this).closest('.watchlist-item');
             const movieId = $(this).data('movie-id');
             
-            // hate ajax hate ajax hate ajax hate ajax
+            // Animate the card removal
+            $card.css('transition', 'all 0.3s ease');
+            $card.css('opacity', '0');
+            $card.css('transform', 'scale(0.8)');
+            
+            // Send the AJAX request to remove from watchlist
             $.ajax({
-                url: '{% url "movie_interaction" %}',
+                url: '{% url "unwatchlist" %}',
                 type: 'POST',
                 data: {
                     'movie_id': movieId,
-                    'interaction_type': 'unwatchlist',
+                    'interaction_type': 'watchlist', // This should match what the backend expects
                     'csrfmiddlewaretoken': '{{ csrf_token }}'
                 },
                 success: function() {
-                    $(this).remove();
-                    // Reload the page to refresh the watchlist
-                    location.reload();
+                    // Complete removal after animation
+                    setTimeout(function() {
+                        $card.remove();
+                        
+                        // Check if watchlist is now empty
+                        if ($('.watchlist-item:visible').length === 0) {
+                            location.reload(); // Reload to show empty
+                        }
+                    }, 300);
                 },
                 error: function() {
+                    // Restore the card on error
+                    $card.css('opacity', '1');
+                    $card.css('transform', 'none');
                     alert('An error occurred. Please try again.');
                 }
             });

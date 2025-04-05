@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from .forms import SignUpForm, FilterForm
-from .models import UserMovieInteraction, UserFilter
+from .models import UserMovieInteraction, UserFilter, Movie
 from .services.tmdb_service import TMDBService
 from django.utils import timezone
 
@@ -63,7 +63,7 @@ def movie_detail(request, movie_id):
 @login_required
 @require_POST
 def movie_interaction(request):
-    """Handle user interaction with a movie (heart, block, watchlist, skip)"""
+    """Handle user interaction with a movie (heart, block, watchlist, unwatch(list), skip)"""
     movie_id = request.POST.get('movie_id')
     interaction_type = request.POST.get('interaction_type')
     
@@ -186,3 +186,25 @@ def watchlist(request):
     }
     
     return render(request, 'flickFinder/watchlist.html', context)
+
+@login_required
+@require_POST
+def unwatchlist(request):
+    # Handle Unwatchlisting
+    movie_id_str = request.POST.get('movie_id')
+    movie_id = int(movie_id_str)
+
+    movie = get_object_or_404(Movie, tmdb_id=movie_id) # Ensure movie exists
+
+    # Get the specific movie object
+    temp = UserMovieInteraction.objects.get(
+        user=request.user,
+        movie=movie,
+        interaction_type='watchlist'
+    )
+
+    # Set interaction type to skip and save
+    temp.interaction_type = 'skip'
+    temp.save()
+
+    return JsonResponse({'message': 'Removed From Watchlist'}, status=200)
