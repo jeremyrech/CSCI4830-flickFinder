@@ -1,28 +1,131 @@
 {% extends 'flickFinder/base.html' %}
+{% load static %}
 
 {% block title %}My Watchlist - FlickFinder{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* Common styles */
+    .section-header {
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 0.5rem;
+    }
+    
+    .card {
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    
+    /* Profile section styles */
+    .profile-header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 10px;
+    }
+    
+    .profile-stats {
+        display: flex;
+        justify-content: space-around;
+        text-align: center;
+        margin-top: 1.5rem;
+    }
+    
+    .stat-item {
+        padding: 0 1rem;
+    }
+    
+    .stat-count {
+        font-size: 1.8rem;
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+    
+    .profile-picture {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        object-fit: cover;
+        background-color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        color: #333;
+        font-size: 2rem;
+    }
+    
+    .user-info {
+        text-align: center;
+    }
+    
+    .username {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .user-meta {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+    
+    .genre-badge {
+        display: inline-block;
+        background-color: #f8f9fa;
+        color: #333;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    
+    /* Watchlist styles */
     .watchlist-header {
-        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .watchlist-title {
+        margin-bottom: 0;
+    }
+    
+    .watchlist-tools {
+        display: flex;
+        align-items: center;
     }
     
     .movie-card {
         margin-bottom: 20px;
-        transition: transform 0.3s;
         height: 100%;
-    }
-    
-    .movie-card:hover {
-        transform: translateY(-5px);
+        border-radius: 10px;
+        overflow: hidden;
     }
     
     .movie-poster {
         width: 100%;
         height: 300px;
         object-fit: cover;
-        border-radius: 5px 5px 0 0;
+        transition: transform 0.3s ease;
+    }
+    
+    .movie-card:hover .movie-poster {
+        transform: scale(1.05);
     }
     
     .movie-info {
@@ -39,45 +142,209 @@
     
     .empty-watchlist {
         text-align: center;
-        padding: 100px 0;
+        padding: 50px 0;
+        background: #f9f9f9;
+        border-radius: 10px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+    
+    /* Filter and search */
+    .filter-section {
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+    }
+    
+    .search-box {
+        margin-right: 10px;
+    }
+    
+    .sort-by {
+        min-width: 150px;
+    }
+    
+    /* Animation for remove/watch buttons */
+    /* probably want to change */
+    .btn-animated {
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .btn-animated:after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 5px;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.5);
+        opacity: 0;
+        border-radius: 100%;
+        transform: scale(1, 1) translate(-50%);
+        transform-origin: 50% 50%;
+    }
+    
+    .btn-animated:hover:after {
+        animation: ripple 1s ease-out;
+    }
+    
+    @keyframes ripple {
+        0% {
+            transform: scale(0, 0);
+            opacity: 0.5;
+        }
+        100% {
+            transform: scale(20, 20);
+            opacity: 0;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="watchlist-header">
-    <h1>My Watchlist</h1>
-    <p>Movies you want to watch</p>
-</div>
-
-{% if watchlist %}
-<div class="row">
-    {% for item in watchlist %}
-    <div class="col-md-3 col-sm-6">
-        <div class="card movie-card">
-            <a href="{% url 'movie_detail' item.movie.tmdb_id %}">
-                <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}" 
-                     alt="{{ item.movie.title }}" class="movie-poster">
-            </a>
-            <div class="movie-info">
-                <h5 class="movie-title" title="{{ item.movie.title }}">{{ item.movie.title }}</h5>
-                <p class="text-muted">Added on {{ item.timestamp|date:"M d, Y" }}</p>
-                <button class="btn btn-sm btn-outline-danger remove-btn" 
-                        data-movie-id="{{ item.movie.tmdb_id }}">
-                    Remove
-                </button>
+<!-- User Profile Section -->
+<div class="profile-header">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="user-info">
+                    <div class="profile-picture">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h2 class="username">{{ user.username }}</h2>
+                    <p class="user-meta">
+                        Member since {{ user_stats.join_date|date:"F Y" }}
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <div class="stat-count">{{ user_stats.watchlist_count }}</div>
+                        <div class="stat-label">Watchlist</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-count">{{ user_stats.heart_count }}</div>
+                        <div class="stat-label">Favorites</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-count">{{ user_stats.skip_count }}</div>
+                        <div class="stat-label">Skipped</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-count">{{ user_stats.total_interactions }}</div>
+                        <div class="stat-label">Total Interactions</div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <h5>Favorite Genres</h5>
+                    <div>
+                        {% for genre_pref in genre_preferences %}
+                        <span class="genre-badge">{{ genre_pref.name }}</span>
+                        {% empty %}
+                        <span class="genre-badge">Interact with movies to see preferences!</span>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    {% endfor %}
 </div>
-{% else %}
-<div class="empty-watchlist">
-    <h3>Your watchlist is empty</h3>
-    <p>Start exploring movies to add them to your watchlist</p>
-    <a href="{% url 'home' %}" class="btn btn-primary">Discover Movies</a>
+
+<!-- Watchlist Section -->
+<div class="container">
+    <div class="watchlist-header">
+        <h2 class="watchlist-title">My Watchlist</h2>
+        
+        <div class="watchlist-tools">
+            <a href="{% url 'home' %}" class="btn btn-primary">
+                <i class="fas fa-film"></i> Discover More
+            </a>
+        </div>
+    </div>
+    
+    <!-- Filter and Search -->
+    {% if watchlist %}
+    <div class="filter-section">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="input-group search-box">
+                    <input type="text" id="searchWatchlist" class="form-control" placeholder="Search your watchlist...">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 d-flex justify-content-end">
+                <select id="sortWatchlist" class="form-select sort-by">
+                    <option value="date-desc">Newest First</option>
+                    <option value="date-asc">Oldest First</option>
+                    <option value="title-asc">Title A-Z</option>
+                    <option value="title-desc">Title Z-A</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Watchlist Movies -->
+    <div class="row" id="watchlistGrid">
+        {% for item in watchlist %}
+        <div class="col-md-3 col-sm-6 mb-4 watchlist-item" 
+             data-title="{{ item.movie.title|lower }}" 
+             data-date="{{ item.timestamp|date:'Ymd' }}">
+            <div class="card movie-card">
+                <div class="poster-container">
+                    <a href="{% url 'movie_detail' item.movie.tmdb_id %}">
+                        <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}" 
+                             alt="{{ item.movie.title }}" class="movie-poster">
+                    </a>
+                </div>
+                <div class="movie-info">
+                    <h5 class="movie-title" title="{{ item.movie.title }}">{{ item.movie.title }}</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted">Added {{ item.timestamp|date:"M d, Y" }}</small>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-outline-danger btn-animated remove-btn" 
+                                data-movie-id="{{ item.movie.tmdb_id }}">
+                            <i class="fas fa-trash-alt"></i> Remove
+                        </button>
+                        <a href="{% url 'movie_detail' item.movie.tmdb_id %}" 
+                           class="btn btn-sm btn-outline-primary btn-animated">
+                            <i class="fas fa-info-circle"></i> Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- No Results Message (Hidden by default) -->
+    <div id="noResults" class="empty-watchlist" style="display: none;">
+        <h3>No matching movies</h3>
+        <p>Try adjusting your search criteria</p>
+    </div>
+    {% else %}
+    <div class="empty-watchlist">
+        <h3>Your watchlist is empty</h3>
+        <p>Start exploring movies to add them to your watchlist</p>
+        <a href="{% url 'home' %}" class="btn btn-primary">
+            <i class="fas fa-film"></i> Discover Movies
+        </a>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -85,25 +352,103 @@
     $(document).ready(function() {
         // Handle remove from watchlist
         $('.remove-btn').click(function() {
+            const $card = $(this).closest('.watchlist-item');
             const movieId = $(this).data('movie-id');
             
-            // hate ajax hate ajax hate ajax hate ajax
+            // Animate the card removal
+            $card.css('transition', 'all 0.3s ease');
+            $card.css('opacity', '0');
+            $card.css('transform', 'scale(0.8)');
+            
+            // Send the AJAX request to remove from watchlist
             $.ajax({
-                url: '{% url "movie_interaction" %}',
+                url: '{% url "remove_from_watchlist" %}',
                 type: 'POST',
                 data: {
                     'movie_id': movieId,
-                    'interaction_type': 'unwatchlist',
                     'csrfmiddlewaretoken': '{{ csrf_token }}'
                 },
-                success: function() {
-                    $(this).remove();
-                    // Reload the page to refresh the watchlist
-                    location.reload();
+                success: function(response) {
+                    // Complete removal after animation
+                    if (response.status === 'success' || response.status === 'not_found') { // Treat not_found as success for UI removal
+                        setTimeout(function() {
+                            $card.remove();
+                            if ($('.watchlist-item').length === 0 && $('#noResults:visible').length === 0) { // Check visible items excluding noResults div
+                                // Reload to show the main empty watchlist message if needed
+                                // Or display a dynamic empty message here
+                                $('#watchlistGrid').html('<div class="col-12"><div class="empty-watchlist"><h3>Watchlist is now empty</h3></div></div>');
+                                $('.filter-section').hide(); // Hide filters if empty
+                            }
+                            // Update stats display dynamically if needed
+                        }, 300);
+                    } else {
+                        // Handle potential errors returned by the view
+                        $card.css('opacity', '1').css('transform', 'none'); // Restore card
+                        alert(response.message || 'Failed to remove item. Please try again.');
+                    }
                 },
                 error: function() {
+                    // Restore the card on error
+                    $card.css('opacity', '1').css('transform', 'none');
                     alert('An error occurred. Please try again.');
                 }
+            });
+        });
+        
+        // Search functionality
+        $('#searchWatchlist').on('keyup', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            let matchFound = false;
+            
+            $('.watchlist-item').each(function() {
+                const title = $(this).data('title');
+                
+                if (title.includes(searchTerm)) {
+                    $(this).show();
+                    matchFound = true;
+                } else {
+                    $(this).hide();
+                }
+            });
+            
+            // Show/hide no results message
+            $('#noResults').toggle(!matchFound);
+        });
+        
+        // Sort functionality
+        $('#sortWatchlist').on('change', function() {
+            const sortValue = $(this).val();
+            const $grid = $('#watchlistGrid');
+            const $items = $('.watchlist-item');
+            
+            // Sort the items
+            $items.sort(function(a, b) {
+                switch(sortValue) {
+                    case 'date-desc':
+                        return $(b).data('date') - $(a).data('date');
+                    case 'date-asc':
+                        return $(a).data('date') - $(b).data('date');
+                    case 'title-asc':
+                        return $(a).data('title').localeCompare($(b).data('title'));
+                    case 'title-desc':
+                        return $(b).data('title').localeCompare($(a).data('title'));
+                    default:
+                        return 0;
+                }
+            });
+            
+            // Reattach sorted items to grid
+            $items.detach().appendTo($grid);
+            
+            // Apply animations
+            $items.each(function(i) {
+                const $item = $(this);
+                $item.css('opacity', '0');
+                
+                setTimeout(function() {
+                    $item.css('transition', 'opacity 0.3s ease');
+                    $item.css('opacity', '1');
+                }, i * 50); // Staggered animation
             });
         });
     });

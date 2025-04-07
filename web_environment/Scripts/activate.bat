@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\Users\Jeremy\desktop\project\CSCI4830-flickFinder\web_environment
+set VIRTUAL_ENV=C:\Users\Jeremy\Desktop\project\CSCI4830-flickFinder\web_environment
 
 if not defined PROMPT set PROMPT=$P$G
 
