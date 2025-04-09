@@ -240,11 +240,157 @@
 <script src="{% static 'flickFinder/js/swipe.js' %}"></script>
 <script>
 // the death of all reason, do not ask why main.js is still empty, I don't know where things go
+(function($) {
+    'use strict';
 $(document).ready(function() {
     // Track if currently in movie transition
     let isTransitioning = false;
     let nextMovieData = null;
     let hasSwiped = false; // Track if user has swiped to prevent navigation
+
+    // commonly used timeout values
+    const FADE_OUT_DURATION = 200;
+    const FADE_IN_DURATION = 300;
+    const TRANSITION_DELAY = 300;
+
+    // DOM elements for jquery, values for readability and condensation later, yes I'm talking to you
+    const $document = $(document);
+    const $movieContainer = $('#movieContainer');
+    const $nextMovieContainer = $('#nextMovieContainer');
+    const $movieActions = $('.movie-actions');
+    const $actionButtons = $('.action-btn');
+    const $filterForm = $('#filterForm');
+    const $saveFiltersButton = $('#saveFilters');
+    const $clearFiltersButton = $('#clearFilters');
+    const $filtersModal = $('#filtersModal');
+
+    function preloadImage(url) {
+        console.log("Preloading image:", url); // Debug
+        const img = new Image();
+        img.src = url;
+    }
+
+    function prepareNextMovie(movie) {
+        if (!movie || !movie.id) {
+            console.error("prepareNextMovie called with invalid movie data:", movie);
+            $('#nextMovieContainer').html('<p>Error loading movie data.</p>');
+            return;
+        }
+        console.log("prepareNextMovie called for:", movie.title); // Debug
+
+        const posterUrl = movie.poster_path
+            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+             // REMINDER need to add this to the static folder
+            : "{% static 'flickFinder/images/no-poster.jpg' %}";
+
+        const releaseYear = movie.release_date
+            ? movie.release_date.substring(0, 4) // Safer substring
+            : 'N/A';
+
+        const voteAvg = movie.vote_average != null ? movie.vote_average.toFixed(1) : 'N/A'; // Format vote avg, check for null
+
+        const overviewText = movie.overview
+             ? movie.overview.substring(0, 150) + (movie.overview.length > 150 ? '...' : '')
+             : 'No overview available.';
+
+        const movieHtml = `
+            <a href="/movie/${movie.id}/" class="poster-link">
+                <img src="${posterUrl}" alt="${movie.title}" class="movie-poster" draggable="false">
+            </a>
+            <div class="movie-info">
+                <h3>${movie.title}</h3>
+                <p>${releaseYear} | ${voteAvg}/10</p>
+                <p class="movie-overview">${overviewText}</p>
+            </div>
+            <div class="swipe-cue swipe-left" style="opacity: 0;"><i class="fas fa-times"></i></div>
+            <div class="swipe-cue swipe-right" style="opacity: 0;"><i class="fas fa-plus"></i></div>
+        `;
+
+        // Set the HTML for next movie container
+        $('#nextMovieContainer').html(movieHtml).css({
+             'opacity': 0,
+             'transform': 'none',
+             'transition': 'none',
+             'display': 'block', // Keep block for layout
+             'z-index': 5,
+             'pointer-events': 'none'
+         });
+        console.log("#nextMovieContainer prepared."); // Debug
+        return true;
+    }
+
+    function showNextMovie() {
+        console.log("showNextMovie called. nextMovieData:", nextMovieData); // Debug
+
+        if (!nextMovieData) {
+            console.error("Cannot show next movie: nextMovieData is null or undefined.");
+            $('#movieContainer').html('<div class="no-movies"><h3>Error</h3><p>Could not load the next movie data.</p></div>').css('opacity', 1);
+            $('.action-btn').prop('disabled', false);
+            isTransitioning = false;
+            hasSwiped = false;
+            return;
+        }
+
+        if ($('#nextMovieContainer').is(':empty')) {
+            console.error("prepareNextMovie did not populate #nextMovieContainer correctly before showNextMovie.");
+            prepareNextMovie(nextMovieData);
+            if ($('#nextMovieContainer').is(':empty')) {
+                $('#movieContainer').html('<div class="no-movies"><h3>Error</h3><p>Failed preparing next movie display.</p></div>').css('opacity', 1);
+                $('.action-btn').prop('disabled', false);
+                isTransitioning = false;
+                hasSwiped = false;
+                nextMovieData = null;
+                return;
+            }
+        }
+
+        const $currentCard = $('#movieContainer');
+        const $nextCard = $('#nextMovieContainer');
+        const fadeInDuration = 300;
+
+        // Fade out current card
+        $currentCard.stop(true, true).animate({ opacity: 0 }, 200, function() {
+            console.log("Current card faded out."); // Debug
+
+            // Swap content
+            $currentCard.html($nextCard.html());
+            $('.action-btn').data('movie-id', nextMovieData.id);
+
+            $currentCard
+                .removeClass('card-exit dragging')
+                .css({ // Explicitly reset position
+                    'transition': 'none', 
+                    'transform': 'none',
+                    'opacity': 0
+                });
+            console.log("Current card HTML updated and styles reset (opacity 0)."); // Debug
+
+            // Clear next card container
+            $nextCard.html('').attr('style', '');
+
+            // Animate the fade-in of the new container
+            $currentCard.animate({ opacity: 1 }, fadeInDuration, function() {
+                console.log("New card fade-in complete."); // Debug
+
+                // Reset swipe functionality AFTER fade-in
+                if (window.movieSwipe?.updateMovieId) {
+                    console.log("Calling window.movieSwipe.updateMovieId with:", nextMovieData.id); // Debug
+                    window.movieSwipe.updateMovieId(nextMovieData.id);
+                } else {
+                    console.warn("window.movieSwipe.updateMovieId not found"); // Debug
+                }
+
+                console.log("Resetting transition state."); // Debug
+                isTransitioning = false;
+                hasSwiped = false;
+                nextMovieData = null; // Clear data, ready for next interaction
+            });
+
+            // Actions that can happen with fade-in:
+            $('.action-btn').data('movie-id', nextMovieData.id);
+            $('.action-btn').prop('disabled', false);
+        });
+    }
 
     $(document).on('click', '.action-btn', function() { // Attach to a static parent
         if (isTransitioning) {
@@ -313,190 +459,62 @@ $(document).ready(function() {
         });
     });
 
-    function preloadImage(url) {
-        console.log("Preloading image:", url); // Debug
-        const img = new Image();
-        img.src = url;
-    }
-
-    function prepareNextMovie(movie) {
-        if (!movie || !movie.id) {
-            console.error("prepareNextMovie called with invalid movie data:", movie);
-            $('#nextMovieContainer').html('<p>Error loading movie data.</p>');
-            return;
-        }
-        console.log("prepareNextMovie called for:", movie.title); // Debug
-
-        const posterUrl = movie.poster_path
-            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-             // REMINDER need to add this to the static folder
-            : "{% static 'flickFinder/images/no-poster.jpg' %}";
-
-        const releaseYear = movie.release_date
-            ? movie.release_date.substring(0, 4) // Safer substring
-            : 'N/A';
-
-        const voteAvg = movie.vote_average != null ? movie.vote_average.toFixed(1) : 'N/A'; // Format vote avg, check for null
-
-        const overviewText = movie.overview
-             ? movie.overview.substring(0, 150) + (movie.overview.length > 150 ? '...' : '')
-             : 'No overview available.';
-
-        const movieHtml = `
-            <a href="/movie/${movie.id}/" class="poster-link">
-                <img src="${posterUrl}" alt="${movie.title}" class="movie-poster" draggable="false">
-            </a>
-            <div class="movie-info">
-                <h3>${movie.title}</h3>
-                <p>${releaseYear} | ${voteAvg}/10</p>
-                <p class="movie-overview">${overviewText}</p>
-            </div>
-            <div class="swipe-cue swipe-left" style="opacity: 0;"><i class="fas fa-times"></i></div>
-            <div class="swipe-cue swipe-right" style="opacity: 0;"><i class="fas fa-plus"></i></div>
-        `;
-
-        // Set the HTML for next movie container
-        $('#nextMovieContainer').html(movieHtml).css({
-             'opacity': 0,
-             'transform': 'none',
-             'transition': 'none',
-             'display': 'block', // Keep block for layout
-             'z-index': 5,
-             'pointer-events': 'none'
-         });
-        console.log("#nextMovieContainer prepared."); // Debug
-        return true;
-    }
-
-    function showNextMovie() {
-    console.log("showNextMovie called. nextMovieData:", nextMovieData); // Debug
-
-    if (!nextMovieData) {
-        console.error("Cannot show next movie: nextMovieData is null or undefined.");
-        $('#movieContainer').html('<div class="no-movies"><h3>Error</h3><p>Could not load the next movie data.</p></div>').css('opacity', 1);
-        $('.action-btn').prop('disabled', false);
-        isTransitioning = false;
-        hasSwiped = false;
-        return;
-    }
-
-    if ($('#nextMovieContainer').is(':empty')) {
-        console.error("prepareNextMovie did not populate #nextMovieContainer correctly before showNextMovie.");
-        prepareNextMovie(nextMovieData);
-        if ($('#nextMovieContainer').is(':empty')) {
-            $('#movieContainer').html('<div class="no-movies"><h3>Error</h3><p>Failed preparing next movie display.</p></div>').css('opacity', 1);
-            $('.action-btn').prop('disabled', false);
-            isTransitioning = false;
-            hasSwiped = false;
-            nextMovieData = null;
-            return;
-        }
-    }
-
-    const $currentCard = $('#movieContainer');
-    const $nextCard = $('#nextMovieContainer');
-    const fadeInDuration = 300;
-
-    // Fade out current card
-    $currentCard.stop(true, true).animate({ opacity: 0 }, 200, function() {
-        console.log("Current card faded out."); // Debug
-
-        // Swap content
-        $currentCard.html($nextCard.html());
-        $('.action-btn').data('movie-id', nextMovieData.id);
-
-        $currentCard
-            .removeClass('card-exit dragging')
-            .css({ // Explicitly reset position
-                'transition': 'none', 
-                'transform': 'none',
-                'opacity': 0
-            });
-        console.log("Current card HTML updated and styles reset (opacity 0)."); // Debug
-
-        // Clear next card container
-        $nextCard.html('').attr('style', '');
-
-        // Animate the fade-in of the new container
-        $currentCard.animate({ opacity: 1 }, fadeInDuration, function() {
-            console.log("New card fade-in complete."); // Debug
-
-            // Reset swipe functionality AFTER fade-in
-            if (window.movieSwipe?.updateMovieId) {
-                console.log("Calling window.movieSwipe.updateMovieId with:", nextMovieData.id); // Debug
-                window.movieSwipe.updateMovieId(nextMovieData.id);
-            } else {
-                console.warn("window.movieSwipe.updateMovieId not found"); // Debug
-            }
-
-            console.log("Resetting transition state."); // Debug
-            isTransitioning = false;
-            hasSwiped = false;
-            nextMovieData = null; // Clear data, ready for next interaction
-        });
-
-        // Actions that can happen with fade-in:
-        $('.action-btn').data('movie-id', nextMovieData.id);
-        $('.action-btn').prop('disabled', false);
-    });
-    }
-
     // Handle filter save
     $('#saveFilters').click(function() {
         const $button = $(this);
         $button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Applying...');
 
-            $.ajax({
-                url: '{% url "save_filters" %}',
-                type: 'POST',
-                data: $('#filterForm').serialize(),
-                success: function(response) {
-                    console.log("Save filters AJAX success:", response); // Debug
-                    $('#filtersModal').modal('hide');
+        $.ajax({
+            url: '{% url "save_filters" %}',
+            type: 'POST',
+            data: $('#filterForm').serialize(),
+            success: function(response) {
+                console.log("Save filters AJAX success:", response); // Debug
+                $('#filtersModal').modal('hide');
 
-                    if (response.status === 'success') {
-                        // refresh
-                        if (response.next_movie) {
-                            isTransitioning = true;
-                            hasSwiped = true;
-                            $('.action-btn').prop('disabled', true);
+                if (response.status === 'success') {
+                    // refresh
+                    if (response.next_movie) {
+                        isTransitioning = true;
+                        hasSwiped = true;
+                        $('.action-btn').prop('disabled', true);
 
-                            nextMovieData = response.next_movie;
-                            if (nextMovieData.poster_path) {
-                                preloadImage(`https://image.tmdb.org/t/p/w500${nextMovieData.poster_path}`);
-                            }
-                            prepareNextMovie(nextMovieData);
-                            showNextMovie();
-                            $('.movie-actions').fadeIn(); // Ensure actions visible
-                        } else {
-                            // No movie found with new filters
-                            $('#movieContainer').html('<div class="no-movies"><h3>No movies match filters</h3><p>Try adjusting your filters.</p></div>');
-                            $('.movie-actions').hide();
-                            $('#nextMovieContainer').html(''); // Clear next container
-                            isTransitioning = false;
-                            hasSwiped = false;
-                            nextMovieData = null;
+                        nextMovieData = response.next_movie;
+                        if (nextMovieData.poster_path) {
+                            preloadImage(`https://image.tmdb.org/t/p/w500${nextMovieData.poster_path}`);
                         }
+                        prepareNextMovie(nextMovieData);
+                        showNextMovie();
+                        $('.movie-actions').fadeIn(); // Ensure actions visible
                     } else {
-                        // Show validation errors
-                        alert('Please correct the errors in the form: ' + JSON.stringify(response.errors));
-                        $button.prop('disabled', false).html('Apply Filters');
-                        $('#filtersModal').modal('show'); 
-                        return;
+                        // No movie found with new filters
+                        $('#movieContainer').html('<div class="no-movies"><h3>No movies match filters</h3><p>Try adjusting your filters.</p></div>');
+                        $('.movie-actions').hide();
+                        $('#nextMovieContainer').html(''); // Clear next container
+                        isTransitioning = false;
+                        hasSwiped = false;
+                        nextMovieData = null;
                     }
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error("Filter save error:", textStatus, errorThrown, jqXHR.responseText);
-                    alert('An error occurred while saving filters. Please try again.');
-                    $filterModal.modal('hide');
-                },
-                complete: function(jqXHR, textStatus) {
-                    if ($button.prop('disabled')) { // Check if still disabled
-                     $button.prop('disabled', false).html('Apply Filters');
-                    }
+                } else {
+                    // Show validation errors
+                    alert('Please correct the errors in the form: ' + JSON.stringify(response.errors));
+                    $button.prop('disabled', false).html('Apply Filters');
+                    $('#filtersModal').modal('show'); 
+                    return;
                 }
-            });
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error("Filter save error:", textStatus, errorThrown, jqXHR.responseText);
+                alert('An error occurred while saving filters. Please try again.');
+                $('#filtersModal').modal('hide');
+            },
+            complete: function(jqXHR, textStatus) {
+                if ($button.prop('disabled')) { // Check if still disabled
+                    $button.prop('disabled', false).html('Apply Filters');
+                }
+            }
         });
+    });
 
     // Clear filters button
     $('#clearFilters').click(function() {
@@ -520,5 +538,6 @@ $(document).ready(function() {
     }
     startup();
 });
+})(jQuery);
 </script>
 {% endblock %}
