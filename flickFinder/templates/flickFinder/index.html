@@ -242,9 +242,8 @@
 // the death of all reason, do not ask why main.js is still empty, I don't know where things go
 (function($) {
     'use strict';
-$(document).ready(function() {
-    // Track if currently in movie transition
-    let isTransitioning = false;
+
+    let isTransitioning = false; // Track if currently in movie transition
     let nextMovieData = null;
     let hasSwiped = false; // Track if user has swiped to prevent navigation
 
@@ -264,6 +263,49 @@ $(document).ready(function() {
     const $clearFiltersButton = $('#clearFilters');
     const $filtersModal = $('#filtersModal');
 
+    function disableUI(showSpinner = false, button = null) {
+        isTransitioning = true;
+        $actionButtons.prop('disabled', true);
+        $movieContainer.addClass('card-exit'); // Prevent clicks on current card during exit
+        if (showSpinner && button) {
+            $(button).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Applying...');
+        }
+    }
+
+    function enableUI(clearSpinner = false, button = null, buttonText = 'Apply Filters') {
+        $actionButtons.prop('disabled', false);
+        $movieContainer.removeClass('card-exit dragging'); // Ensure interaction is possible again
+        isTransitioning = false;
+        if (clearSpinner && button) {
+             $(button).prop('disabled', false).html(buttonText);
+        }
+    }
+
+    function resetTransitionState(resetSwipe = true) {
+        console.log("Resetting transition state."); // Debug
+        isTransitioning = false;
+        if(resetSwipe) {
+            hasSwiped = false;
+        }
+        nextMovieData = null; // Clear data, ready for next interaction
+    }
+
+    function displayEOL(message, source = 'interaction') {
+        const defaultMessage = source === 'filter' ? 'No movies match filters. Try adjusting your filters.' : 'No more movies found.';
+        const displayMessage = message || defaultMessage;
+        const title = source === 'filter' ? 'No Matches Found' : 'End of the Line!';
+
+        $movieContainer
+            .html(`<div class="no-movies"><h3>${title}</h3><p>${displayMessage}</p></div>`)
+            .stop(true, true) // Stop any animation
+            .css('opacity', 1)
+            .removeClass('card-exit'); // Clean up classes
+        $movieActions.hide();
+        $nextMovieContainer.html(''); // Clear stage
+        resetTransitionState();
+        enableUI();
+    }
+
     function preloadImage(url) {
         console.log("Preloading image:", url); // Debug
         const img = new Image();
@@ -273,8 +315,8 @@ $(document).ready(function() {
     function prepareNextMovie(movie) {
         if (!movie || !movie.id) {
             console.error("prepareNextMovie called with invalid movie data:", movie);
-            $('#nextMovieContainer').html('<p>Error loading movie data.</p>');
-            return;
+            $nextMovieContainer.html('<p>Error loading movie data.</p>');
+            return false;
         }
         console.log("prepareNextMovie called for:", movie.title); // Debug
 
@@ -307,13 +349,9 @@ $(document).ready(function() {
         `;
 
         // Set the HTML for next movie container
-        $('#nextMovieContainer').html(movieHtml).css({
-             'opacity': 0,
-             'transform': 'none',
-             'transition': 'none',
-             'display': 'block', // Keep block for layout
-             'z-index': 5,
-             'pointer-events': 'none'
+        $nextMovieContainer.html(movieHtml).css({
+             'opacity': 0, 'transform': 'none', 'transition': 'none',
+             'display': 'block', 'z-index': 5, 'pointer-events': 'none'
          });
         console.log("#nextMovieContainer prepared."); // Debug
         return true;
@@ -324,39 +362,32 @@ $(document).ready(function() {
 
         if (!nextMovieData) {
             console.error("Cannot show next movie: nextMovieData is null or undefined.");
-            $('#movieContainer').html('<div class="no-movies"><h3>Error</h3><p>Could not load the next movie data.</p></div>').css('opacity', 1);
-            $('.action-btn').prop('disabled', false);
-            isTransitioning = false;
-            hasSwiped = false;
+            displayEOL("Could not load the next movie data.", 'error')
+            resetTransitionState();
+            enableUI();
             return;
         }
 
-        if ($('#nextMovieContainer').is(':empty')) {
+        if ($nextMovieContainer.is(':empty')) {
             console.error("prepareNextMovie did not populate #nextMovieContainer correctly before showNextMovie.");
             prepareNextMovie(nextMovieData);
-            if ($('#nextMovieContainer').is(':empty')) {
-                $('#movieContainer').html('<div class="no-movies"><h3>Error</h3><p>Failed preparing next movie display.</p></div>').css('opacity', 1);
-                $('.action-btn').prop('disabled', false);
-                isTransitioning = false;
-                hasSwiped = false;
-                nextMovieData = null;
+            if (!prepareNextMovie(nextMovieData)) {
+                displayEOL("Failed preparing next movie display.", 'error');
+                resetTransitionState();
+                enableUI();
                 return;
             }
         }
 
-        const $currentCard = $('#movieContainer');
-        const $nextCard = $('#nextMovieContainer');
-        const fadeInDuration = 300;
-
         // Fade out current card
-        $currentCard.stop(true, true).animate({ opacity: 0 }, 200, function() {
+        $movieContainer.stop(true, true).animate({ opacity: 0 }, FADE_OUT_DURATION, function() {
             console.log("Current card faded out."); // Debug
 
             // Swap content
-            $currentCard.html($nextCard.html());
-            $('.action-btn').data('movie-id', nextMovieData.id);
+            $movieContainer.html($nextMovieContainer.html());
+            $actionButtons.data('movie-id', nextMovieData.id);
 
-            $currentCard
+            $movieContainer
                 .removeClass('card-exit dragging')
                 .css({ // Explicitly reset position
                     'transition': 'none', 
@@ -366,55 +397,45 @@ $(document).ready(function() {
             console.log("Current card HTML updated and styles reset (opacity 0)."); // Debug
 
             // Clear next card container
-            $nextCard.html('').attr('style', '');
+            $nextMovieContainer.html('').attr('style', '');
 
             // Animate the fade-in of the new container
-            $currentCard.animate({ opacity: 1 }, fadeInDuration, function() {
+            $movieContainer.animate({ opacity: 1 }, FADE_IN_DURATION, function() {
                 console.log("New card fade-in complete."); // Debug
 
                 // Reset swipe functionality AFTER fade-in
                 if (window.movieSwipe?.updateMovieId) {
-                    console.log("Calling window.movieSwipe.updateMovieId with:", nextMovieData.id); // Debug
                     window.movieSwipe.updateMovieId(nextMovieData.id);
                 } else {
                     console.warn("window.movieSwipe.updateMovieId not found"); // Debug
                 }
-
-                console.log("Resetting transition state."); // Debug
-                isTransitioning = false;
-                hasSwiped = false;
-                nextMovieData = null; // Clear data, ready for next interaction
+                resetTransitionState();
             });
 
             // Actions that can happen with fade-in:
-            $('.action-btn').data('movie-id', nextMovieData.id);
-            $('.action-btn').prop('disabled', false);
+            enableUI();
         });
     }
 
-    $(document).on('click', '.action-btn', function() { // Attach to a static parent
+    $document.on('click', '.action-btn', function() { // Attach to a static parent
         if (isTransitioning) {
             console.log("Interaction blocked: already transitioning."); // Debug
             return;
         }
 
-        isTransitioning = true;
+        disableUI();
         hasSwiped = true;
 
         const $button = $(this); // Store button reference
         const movieId = $button.data('movie-id');
         const action = $button.data('action');
 
-        // Disable buttons during transition
-        $('.action-btn').prop('disabled', true);
-        $('#movieContainer').addClass('card-exit'); // Prevent clicks on current card
-
         // Animate swipe for buttons
         if (window.movieSwipe?.animateSwipe) {
             window.movieSwipe.animateSwipe(action); // pass interaction type
         } else {
             // Fallback: simple fade out
-            $('#movieContainer').fadeOut(200);
+            console.log("Swipe animation function not found, relying on standard fade.");
         }
 
         $.ajax({
@@ -423,7 +444,7 @@ $(document).ready(function() {
             data: {
                 'movie_id': movieId,
                 'interaction_type': action,
-                'csrfmiddlewaretoken': '{{ csrf_token }}'
+                'csrfmiddlewaretoken': $('input[name="csrfmiddlewaretoken"]').val()
             },
             success: function(response) {
                 if (response.status === 'success' && response.next_movie) {
@@ -431,113 +452,112 @@ $(document).ready(function() {
                     if (nextMovieData.poster_path) {
                         preloadImage(`https://image.tmdb.org/t/p/w500${nextMovieData.poster_path}`);
                     }
-                    prepareNextMovie(nextMovieData);
-                    // Show next movie after delay matching fade
-                    setTimeout(showNextMovie, 300);
-                } else { // Handle 'no_more_movies'
-                    setTimeout(() => {
-                        const message = response.message || 'No more movies found.';
-                        $('#movieContainer').html('<div class="no-movies"><h3>End of the Line!</h3><p>' + message + '</p></div>').fadeIn();
-                        $('.movie-actions').hide();
-                        $('#nextMovieContainer').html(''); // Clear next container
-                        isTransitioning = false;
-                        $('.action-btn').prop('disabled', false);
-                    }, 300);
+                    if (prepareNextMovie(nextMovieData)) {
+                        // Show next movie after delay matching fade
+                        setTimeout(showNextMovie, TRANSITION_DELAY);
+                    } else { // Handle errors
+                        displayEOL("Failed to prepare next movie.", 'error');
+                        resetTransitionState();
+                        enableUI();
+                    }
+                } else {
+                    // Handle 'no_more_movies'
+                    setTimeout(() => displayEOL(response.message, 'interaction'), TRANSITION_DELAY)
                 }
             },
             error: function(jqXHR, textStatus, errorThrown) {
-                console.error("Interaction error:", textStatus, errorThrown,jqXHR.responseText); // Log error
+                console.error("Interaction error:", textStatus, errorThrown, jqXHR.responseText); // Log error
                 alert('An error occurred during the interaction. Please try again.');
-                $('#movieContainer').removeClass('card-exit').stop(true, true).fadeIn(); // Stop animation, fade back in
-                if (window.movieSwipe && typeof window.movieSwipe.resetCardPosition === 'function') {
+                if (window.movieSwipe?.resetCardPosition) {
                     window.movieSwipe.resetCardPosition();
                 }
-                isTransitioning = false;
-                hasSwiped = false; // Reset swipe state
-                $('.action-btn').prop('disabled', false); // Re-enable buttons
+                $movieContainer.stop(true, true).css('opacity', 1); // make sure card visible
+                resetTransitionState();
+                enableUI(); // Re-enable buttons after error
             }
         });
     });
 
     // Handle filter save
-    $('#saveFilters').click(function() {
+    $saveFiltersButton.click(function() {
         const $button = $(this);
-        $button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Applying...');
+        disableUI(true, $button);
 
         $.ajax({
             url: '{% url "save_filters" %}',
             type: 'POST',
-            data: $('#filterForm').serialize(),
+            data: $filterForm.serialize(),
             success: function(response) {
                 console.log("Save filters AJAX success:", response); // Debug
-                $('#filtersModal').modal('hide');
+                $filtersModal.modal('hide');
 
                 if (response.status === 'success') {
-                    // refresh
                     if (response.next_movie) {
-                        isTransitioning = true;
-                        hasSwiped = true;
-                        $('.action-btn').prop('disabled', true);
+                        hasSwiped = true; // treat filter like a swipe action
 
                         nextMovieData = response.next_movie;
                         if (nextMovieData.poster_path) {
                             preloadImage(`https://image.tmdb.org/t/p/w500${nextMovieData.poster_path}`);
                         }
-                        prepareNextMovie(nextMovieData);
-                        showNextMovie();
-                        $('.movie-actions').fadeIn(); // Ensure actions visible
+                        if (prepareNextMovie(nextMovieData)) {
+                            showNextMovie();
+                            $movieActions.fadeIn(); // Ensure actions are visible
+                            enableUI(true, $button, 'Apply Filters')
+                        } else {
+                            displayEOL("Failed to prepare first movie after filter.", 'error');
+                            resetTransitionState();
+                            enableUI(true, $button, 'Apply Filters'); // Pass button to reset spinner
+                        }
                     } else {
                         // No movie found with new filters
-                        $('#movieContainer').html('<div class="no-movies"><h3>No movies match filters</h3><p>Try adjusting your filters.</p></div>');
-                        $('.movie-actions').hide();
-                        $('#nextMovieContainer').html(''); // Clear next container
-                        isTransitioning = false;
-                        hasSwiped = false;
-                        nextMovieData = null;
+                        displayEOL(null, 'filter'); // Use specific message for filters
+                        enableUI(true, $button, 'Apply Filters');
                     }
                 } else {
                     // Show validation errors
                     alert('Please correct the errors in the form: ' + JSON.stringify(response.errors));
-                    $button.prop('disabled', false).html('Apply Filters');
-                    $('#filtersModal').modal('show'); 
-                    return;
+                    enableUI(true, $button, 'Apply Filters');
+                    isTransitioning = false; // Allow retry without full state reset
+                    $filtersModal.modal('show');
                 }
             },
             error: function(jqXHR, textStatus, errorThrown) {
                 console.error("Filter save error:", textStatus, errorThrown, jqXHR.responseText);
                 alert('An error occurred while saving filters. Please try again.');
-                $('#filtersModal').modal('hide');
+                $filtersModal.modal('hide');
+                resetTransitionState();
+                enableUI(true, $button, 'Apply Filters'); // Reset button fully on this error
             },
-            complete: function(jqXHR, textStatus) {
-                if ($button.prop('disabled')) { // Check if still disabled
-                    $button.prop('disabled', false).html('Apply Filters');
-                }
-            }
         });
     });
 
     // Clear filters button
-    $('#clearFilters').click(function() {
+    $clearFiltersButton.on('click', function() {
         // Clear form fields visually
-        $('#filterForm').find('#id_min_release_year').val('');
-        $('#filterForm').find('#id_max_release_year').val('');
-        $('#filterForm').find('#id_min_rating').val('');
-        $('#filterForm input[type="checkbox"]').prop('checked', false); // Ensure checkboxes are cleared
+        $filterForm.find('#id_min_release_year').val('');
+        $filterForm.find('#id_max_release_year').val('');
+        $filterForm.find('#id_min_rating').val('');
+        $filterForm.find('input[type="checkbox"]').prop('checked', false); // Ensure checkboxes are cleared
 
         // Trigger the save action to clear filters on backend and reload movie
-        $('#saveFilters').click();
+        $saveFiltersButton.click();
     });
 
-    function startup() {
+    function init() {
         $('#movieContainer').css('opacity', 0);
         if ($('#movieContainer').find('.poster-link').length > 0) {
-            $('#movieContainer').animate({ opacity: 1 }, 300);
+            $('#movieContainer').animate({ opacity: 1 }, FADE_IN_DURATION);
         } else {
                 $('#movieContainer').css('opacity', 1);
-            }
+        }
+
+        const csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+        if (!csrfToken) {
+            console.warn('CSRF token input field not found.');
+        }
     }
-    startup();
-});
+    
+    init();
 })(jQuery);
 </script>
 {% endblock %}
