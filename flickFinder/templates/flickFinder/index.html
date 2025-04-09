@@ -501,12 +501,24 @@ $(document).ready(function() {
     // Clear filters button
     $('#clearFilters').click(function() {
         // Clear form fields visually
-        $('#filterForm')[0].reset(); // Reset native form elements (inputs, selects)
+        $('#filterForm').find('#id_min_release_year').val('');
+        $('#filterForm').find('#id_max_release_year').val('');
+        $('#filterForm').find('#id_min_rating').val('');
         $('#filterForm input[type="checkbox"]').prop('checked', false); // Ensure checkboxes are cleared
 
         // Trigger the save action to clear filters on backend and reload movie
         $('#saveFilters').click();
     });
-    });
+
+    function startup() {
+        $('#movieContainer').css('opacity', 0);
+        if ($('#movieContainer').find('.poster-link').length > 0) {
+            $('#movieContainer').animate({ opacity: 1 }, 300);
+        } else {
+                $('#movieContainer').css('opacity', 1);
+            }
+    }
+    startup();
+});
 </script>
 {% endblock %}

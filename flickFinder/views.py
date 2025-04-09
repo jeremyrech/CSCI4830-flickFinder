@@ -13,11 +13,27 @@ from collections import Counter
 import random
 
 logger = logging.getLogger(__name__)
-BATCH_FETCH_PAGES = 3
+BATCH_FETCH_PAGES = 5
 MAX_TMDB_PAGE = 500
 
 # Initialize TMDB service
 tmdb_service = TMDBService()
+
+def _get_excluded_ids(user):
+    """ Helper for get_next_movie_for_user to get excluded ids for pre-filtering """
+    try:
+        excluded_interactions = UserMovieInteraction.objects.filter(user=user)
+        excluded_tmdb_ids = set(excluded_interactions.values_list('movie__tmdb_id', flat=True))
+        three_days_ago = timezone.now() - timezone.timedelta(days=3)
+        actively_blocked_ids = set(UserMovieInteraction.objects.filter(
+            user=user, interaction_type='block', timestamp__gte=three_days_ago
+        ).values_list('movie__tmdb_id', flat=True))
+        excluded_tmdb_ids.update(actively_blocked_ids)
+        logger.debug(f"User {user.id} excluded IDs count: {len(excluded_tmdb_ids)}")
+        return excluded_tmdb_ids
+    except Exception as e:
+        logger.exception(f"Error retrieving excluded interactions for user {user.id}, {e}")
+        return set() # Return empty set on error
 
 def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass request for session, death death death
     """ Attempts to serve from cache first. If cache is empty, fetches a batch"""
@@ -29,7 +45,8 @@ def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass 
 
     # cache first
     cached_ids = request.session.get(session_key, [])
-    logger.debug(f"User {user.id}: Found {len(cached_ids)} movie IDs in session cache.")
+    source_of_cache = request.session.get(f'{session_key}_source', 'unknown')
+    logger.debug(f"User {user.id}: Found {len(cached_ids)} movie IDs in session cache. (Source: {source_of_cache}).")
 
     while cached_ids:
         movie_id = cached_ids.pop(0) # Get the next ID from the front
@@ -44,6 +61,7 @@ def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass 
                 if movie_obj:
                     logger.info(f"Serving movie '{movie_obj.title}' (ID: {movie_id}) from cache.")
                     request.session[session_key] = cached_ids # Update cache in session
+                    request.session.modified = True
                     return movie_data
                 else:
                      logger.warning(f"Failed to get/create movie object for cached ID {movie_id}. Skipping.")
@@ -59,86 +77,99 @@ def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass 
 
         # Update cache in session if loop continues
         request.session[session_key] = cached_ids
+        request.session.modified = True
 
     # Cache is empty or exhausted - Fetch a new batch
     logger.info(f"Session cache empty or exhausted for user {user.id}. Fetching new batch...")
+    excluded_tmdb_ids = _get_excluded_ids(user) # Get current list of blocked
 
     # get filters for new batch
     user_filters = None
+    fetch_with_filters = False
     if apply_filters:
         try:
-             user_filters, _ = UserFilter.objects.get_or_create(user=user) # can use user since we already do the request thing earlier
-             logger.debug(f"Using filters for batch fetch: {user_filters.__dict__ if user_filters else 'None'}")
+            user_filters, _ = UserFilter.objects.get_or_create(user=user) # can use user since we already do the request thing earlier
+            if user_filters and (user_filters.genre_ids or user_filters.min_release_year or
+                                 user_filters.max_release_year or user_filters.min_rating):
+                fetch_with_filters = True
+                logger.debug(f"Using filters for batch fetch: {user_filters.__dict__ if user_filters else 'None'}")
+            else:
+                logger.info(f"apply_filters=true, but no filters set by user {user.id}. Fetching without filters.")
         except Exception as e:
-             logger.exception(f"Error retrieving UserFilter for user {user.id} during batch fetch.")
-             user_filters = None
-
-    # get current excluded
-    try:
-        excluded_interactions = UserMovieInteraction.objects.filter(user=user)
-        excluded_tmdb_ids = set(excluded_interactions.values_list('movie__tmdb_id', flat=True))
-        three_days_ago = timezone.now() - timezone.timedelta(days=3)
-        actively_blocked_ids = set(UserMovieInteraction.objects.filter(
-            user=user, interaction_type='block', timestamp__gte=three_days_ago
-        ).values_list('movie__tmdb_id', flat=True))
-        excluded_tmdb_ids.update(actively_blocked_ids)
-        logger.debug(f"User {user.id} excluded IDs for batch filtering: {len(excluded_tmdb_ids)}")
-    except Exception as e:
-        logger.exception(f"Error retrieving excluded interactions for user {user.id} during batch fetch.")
-        excluded_tmdb_ids = set() # Proceed with empty set if error
+             logger.exception(f"Error retrieving UserFilter for user {user.id}. Fetching without filters.")
+             fetch_with_filters = False
 
     # fetch batch
     potential_movies = {} # Use dict to automatically handle duplicates by ID
-    start_page = random.randint(1, max(1, MAX_TMDB_PAGE - BATCH_FETCH_PAGES + 1)) # add some variety, time gets bad later
-    pages_to_fetch = range(start_page, start_page + BATCH_FETCH_PAGES)
-    logger.debug(f"Fetching batch pages {list(pages_to_fetch)}...")
+    cache_source_name = "unknown" # starts unknown to debug if unknown is passed
 
-    sources_to_try = []
-    if apply_filters and user_filters:
-        sources_to_try.append({'use_filters': True, 'name': 'Filters'})
-    sources_to_try.append({'use_filters': False, 'name': 'Popular'}) # Always try popular
+    if fetch_with_filters:
+        cache_source_name = "filtered"
+        logger.info(f"Starting filtered batch fetch for user {user.id}...")
+        # Initial call to get total_pages for this filter set, may be unoptimized
+        try:
+            _, initial_total_pages = tmdb_service.discover_movies(user_filters, page=1)
+            logger.info(f"Filter query initial total_pages = {initial_total_pages}")
+        except Exception as e:
+            logger.exception("Error during initial filtered call to get total_pages.")
+            initial_total_pages = 0 # Assume failure means no results
 
-    for source in sources_to_try:
+        if initial_total_pages == 0:
+            logger.warning(f"No results found for user {user.id}'s filters (total_pages=0). No movies to cache or serve.")
+            request.session[session_key] = [] # Ensure cache is empty
+            request.session[f'{session_key}_source'] = cache_source_name
+            request.session.modified = True
+            return None
+
+        # Determine pages to sample within the available range
+        search_max_page = min(initial_total_pages, MAX_TMDB_PAGE)
+        # May likely need to adjust this to search_max_page - 1, as last page is likely incomplete
+        # Trying to iterate over last page may lead to errors, but it could also be fine, so I'm leaving it
+        num_pages_to_sample = min(BATCH_FETCH_PAGES, search_max_page)
+        if num_pages_to_sample > 0: # This should never happen, as we already checked for 0 results
+             # Sample randomly within the available pages for these filters
+             pages_to_fetch = random.sample(range(1, search_max_page + 1), num_pages_to_sample)
+             logger.debug(f"Fetching filtered batch from pages: {pages_to_fetch} (out of {search_max_page} available)")
+
+             for page_num in pages_to_fetch:
+                 try:
+                     movies_page, _ = tmdb_service.discover_movies(user_filters, page=page_num)
+                     if movies_page:
+                         logger.debug(f"Fetched {len(movies_page)} movies from filtered page {page_num}")
+                         for movie_data in movies_page:
+                             if movie_data and movie_data.get('id'): potential_movies[movie_data['id']] = movie_data
+                 except Exception as e: logger.exception(f"Error fetching filtered page {page_num}")
+        else:
+            logger.warning(f"Cannot sample pages for filtered results (num_pages_to_sample=0).")
+    # Simple popular fetch
+    else: # fetch_with_filters is False
+        cache_source_name = "popular"
+        logger.info(f"Starting popular batch fetch for user {user.id}...")
+        # Likely will want to change this to a range of 1-500, but I'm leaving it for now
+        pages_to_fetch = random.sample(range(1, MAX_TMDB_PAGE + 1), BATCH_FETCH_PAGES)
+        logger.debug(f"Fetching popular batch from pages: {list(pages_to_fetch)}")
         for page_num in pages_to_fetch:
             try:
-                movies_page = None
-                api_source_name = source['name']
-                if source['use_filters']:
-                    movies_page = tmdb_service.discover_movies(user_filters, page=page_num)
-                else:
-                    movies_page = tmdb_service.get_popular_movies(page=page_num)
-
+                movies_page, _ = tmdb_service.get_popular_movies(page=page_num)
                 if movies_page:
-                    logger.debug(f"Fetched {len(movies_page)} movies from {api_source_name} page {page_num}")
+                    logger.debug(f"Fetched {len(movies_page)} movies from popular page {page_num}")
                     for movie_data in movies_page:
-                        if movie_data and movie_data.get('id'): # Basic validation
-                            potential_movies[movie_data['id']] = movie_data # Add/overwrite in dict
-                elif movies_page is None:
-                     logger.warning(f"TMDB service returned None for {api_source_name} page {page_num}.")
-                # else: movies_page is []
-            except TMDBServiceError as e:
-                 logger.error(f"TMDB Service Error during batch fetch {api_source_name} page {page_num}: {e}")
-            except Exception as e:
-                 logger.exception(f"Unexpected error during batch fetch {api_source_name} page {page_num}")
-
+                        if movie_data and movie_data.get('id'): potential_movies[movie_data['id']] = movie_data
+            except Exception as e: logger.exception(f"Error fetching popular page {page_num}")
+    # start filtering and cache
     logger.info(f"Batch fetch complete. Total unique potential movies fetched: {len(potential_movies)}")
-
-    # Filter batch
-    valid_movie_ids = []
-    for tmdb_id, movie_data in potential_movies.items():
-        if tmdb_id not in excluded_tmdb_ids:
-            valid_movie_ids.append(tmdb_id)
+    valid_movie_ids = [tmdb_id for tmdb_id in potential_movies if tmdb_id not in excluded_tmdb_ids]
     logger.info(f"Found {len(valid_movie_ids)} valid (non-excluded) movies in the batch.")
 
-    # Shuffle and cache
     if valid_movie_ids:
-        random.shuffle(valid_movie_ids) # Shuffle for variety
+        random.shuffle(valid_movie_ids)
         request.session[session_key] = valid_movie_ids
-        request.session.modified = True # Ensure session is saved
-        logger.debug(f"Cached {len(valid_movie_ids)} shuffled IDs in session key '{session_key}'.")
+        request.session[f'{session_key}_source'] = cache_source_name # Store source type
+        request.session.modified = True
+        logger.debug(f"Cached {len(valid_movie_ids)} shuffled IDs (Source: {cache_source_name}).")
 
-        # Try serving the first item from new cache
-        newly_cached_id = valid_movie_ids.pop(0)
+        # Serve first item from new cache
+        newly_cached_id = valid_movie_ids.pop(0) # Get first ID
         logger.debug(f"Attempting to serve first item from new cache: {newly_cached_id}")
         try:
             movie_data = tmdb_service.get_movie_details(newly_cached_id)
@@ -146,25 +177,24 @@ def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass 
                 movie_obj = tmdb_service.get_or_create_movie(movie_data)
                 if movie_obj:
                      logger.info(f"Serving movie '{movie_obj.title}' (ID: {newly_cached_id}) immediately after batch fetch.")
-                     request.session[session_key] = valid_movie_ids # Update session cache
+                     request.session[session_key] = valid_movie_ids # Update remaining cache
                      request.session.modified = True
                      return movie_data
                 else: logger.warning(f"Failed get/create for newly cached ID {newly_cached_id}.")
             else: logger.warning(f"TMDB details None for newly cached ID {newly_cached_id}.")
-        except TMDBServiceError as e: logger.error(f"TMDB error fetching details for newly cached ID {newly_cached_id}: {e}")
         except Exception as e: logger.exception(f"Unexpected error processing newly cached ID {newly_cached_id}")
-
-        # If serving the first item failed, update session anyway and return
+        # If serving first item failed, update session cache anyway before returning None
         request.session[session_key] = valid_movie_ids
         request.session.modified = True
 
-
-    # Batch fetch yielded no valid movies or serving first item failed
-    logger.warning(f"Failed to find any suitable movie after batch fetch for user {user.id}.")
-    # Clear cache in case it was populated but serving failed
-    request.session[session_key] = []
+    # Batch fetch yielded no valid movies OR serving first failed
+    logger.warning(f"Failed to find or serve a suitable movie after batch fetch (Source: {cache_source_name}) for user {user.id}.")
+    request.session[session_key] = [] # Ensure cache is empty
+    request.session[f'{session_key}_source'] = cache_source_name
     request.session.modified = True
-    return None # No movie found :(
+    return None # No movie found
+
+    # reminder: I may want to add a popular fetch as a backup or prompt user with popular button, but that's js in index
 
 def home(request):
     """Home page with movie recommendations"""
@@ -248,7 +278,6 @@ def movie_interaction(request):
                  return JsonResponse({'status': 'error', 'message': 'Could not save movie locally.'}, status=500)
         except TMDBServiceError:
              return JsonResponse({'status': 'error', 'message': 'Error communicating with movie service.'}, status=503)
-
     
     # Record the interaction
     interaction, created = UserMovieInteraction.objects.update_or_create(

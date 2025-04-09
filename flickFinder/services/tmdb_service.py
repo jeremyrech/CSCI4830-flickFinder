@@ -60,11 +60,11 @@ class TMDBService:
                   'include_adult': 'false',
                   'include_video': 'false',
                   'with_original_language': 'en',
-                  'vote_count.gte': 50
+                  'vote_count.gte': 100
         } # vote count prevents randoms
         
         if filters:
-            genre_ids_list = getattr(filters, 'genre_ids', []) if filters else []
+            genre_ids_list = getattr(filters, 'genre_ids', None)
             if isinstance(genre_ids_list, list) and genre_ids_list:
                 # Filter out empty strings if any
                 valid_genre_ids = [gid for gid in genre_ids_list if gid]
@@ -83,10 +83,15 @@ class TMDBService:
         # Fetch movies from discovery endpoint
         try:
             data = self._make_request("discover/movie", params)
-            return data.get('results', []) if data else []
+            if data:
+                results = data.get('results', [])
+                total_pages = min(data.get('total_pages', 0), 500)
+                return results, total_pages
+            else:
+                return [], 0
         except TMDBServiceError:
             # Logged in _make_request, return empty list to calling function
-             return []
+             return [], 0
     
     def get_popular_movies(self, page=1):
         """Get popular movies without any filters"""
@@ -96,16 +101,21 @@ class TMDBService:
             'include_adult': 'false',
             'include_video': 'false',
             'with_original_language': 'en',
-            'vote_count.gte': 50
+            'vote_count.gte': 100
         }
         
         # Fetch movies from discovery endpoint
         try:
             data = self._make_request("discover/movie", params)
-            return data.get('results', []) if data else []
+            if data:
+                results = data.get('results', [])
+                total_pages = min(data.get('total_pages', 0), 500)
+                return results, total_pages
+            else:
+                return [], 0
         except TMDBServiceError:
             # Logged in _make_request, return empty list to calling function
-             return []
+             return [], 0
     
     def get_movie_details(self, movie_id):
         """Get information about a specific movie"""
