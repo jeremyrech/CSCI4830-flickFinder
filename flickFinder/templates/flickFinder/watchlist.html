@@ -12,12 +12,6 @@
         padding-bottom: 0.5rem;
     }
     
-    .card {
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        border: none;
-        transition: all 0.3s ease;
-    }
-    
     .card:hover {
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         transform: translateY(-3px);
@@ -66,6 +60,7 @@
         margin: 0 auto 1rem;
         color: #333;
         font-size: 2rem;
+        border: 1px solid #dee2e6;
     }
     
     .user-info {
@@ -89,7 +84,7 @@
         padding: 4px 8px;
         border-radius: 12px;
         font-size: 0.8rem;
-        margin-right: 5px;
+        margin-right: 3px;
         margin-bottom: 5px;
     }
     
@@ -99,6 +94,8 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 1.5rem;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 0.5rem;
     }
     
     .watchlist-title {
@@ -119,9 +116,10 @@
     
     .movie-poster {
         width: 100%;
-        height: 300px;
+        height: 400px;
         object-fit: cover;
         transition: transform 0.3s ease;
+        display: block;
     }
     
     .movie-card:hover .movie-poster {
@@ -210,12 +208,12 @@
 
 {% block content %}
 <!-- User Profile Section -->
-<div class="profile-header">
+<div class="profile-header mb-4">
     <div class="container">
         <div class="row">
             <div class="col-md-4">
                 <div class="user-info">
-                    <div class="profile-picture">
+                    <div class="profile-picture mx-auto">
                         <i class="fas fa-user"></i>
                     </div>
                     <h2 class="username">{{ user.username }}</h2>
@@ -266,7 +264,7 @@
         
         <div class="watchlist-tools">
             <a href="{% url 'home' %}" class="btn btn-primary">
-                <i class="fas fa-film"></i> Discover More
+                <i class="fas fa-film me-1"></i> Discover More
             </a>
         </div>
     </div>
@@ -286,11 +284,13 @@
                 </div>
             </div>
             <div class="col-md-6 d-flex justify-content-end">
-                <select id="sortWatchlist" class="form-select sort-by">
-                    <option value="date-desc">Newest First</option>
-                    <option value="date-asc">Oldest First</option>
-                    <option value="title-asc">Title A-Z</option>
-                    <option value="title-desc">Title Z-A</option>
+                <select id="sortWatchlist" class="form-select sort-by"> <!-- my funny little icons don't work :( -->
+                    <option value="date-desc"><i class="fas fa-calendar-alt me-1"></i> Newest First</option>
+                    <option value="date-asc"><i class="fas fa-calendar-alt me-1"></i> Oldest First</option>
+                    <option value="title-asc"><i class="fas fa-sort-alpha-down me-1"></i> Title A-Z</option>
+                    <option value="title-desc"><i class="fas fa-sort-alpha-up me-1"></i> Title Z-A</option>
+                    <option value="rating-desc"><i class="fas fa-star me-1"></i> Rating Desc</option>
+                    <option value="rating-asc"><i class="fas fa-star me-1"></i> Rating Asc</option>
                 </select>
             </div>
         </div>
@@ -299,22 +299,32 @@
     <!-- Watchlist Movies -->
     <div class="row" id="watchlistGrid">
         {% for item in watchlist %}
-        <div class="col-md-3 col-sm-6 mb-4 watchlist-item" 
+        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4 watchlist-item" 
              data-title="{{ item.movie.title|lower }}" 
-             data-date="{{ item.timestamp|date:'Ymd' }}">
-            <div class="card movie-card">
-                <div class="poster-container">
+             data-date="{{ item.timestamp|date:'YmdHis' }}"
+             data-genres="{% for genre in item.movie.genres %}{{ genre.id }},{% endfor %}"
+             data-rating="{{ item.movie.vote_average|default:0 }}">
+            <div class="card movie-card h-100">
+                <div class="poster-container position-relative">
                     <a href="{% url 'movie_detail' item.movie.tmdb_id %}">
                         <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}" 
                              alt="{{ item.movie.title }}" class="movie-poster">
                     </a>
+                    {% if item.movie.vote_average %}
+                    <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2">
+                        <i class="fas fa-star"></i> {{ item.movie.vote_average|floatformat:1 }}
+                    </span>
+                    {% endif %}
                 </div>
-                <div class="movie-info">
-                    <h5 class="movie-title" title="{{ item.movie.title }}">{{ item.movie.title }}</h5>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <small class="text-muted">Added {{ item.timestamp|date:"M d, Y" }}</small>
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title movie-title" title="{{ item.movie.title }}">{{ item.movie.title }}</h5>
+                    <div class="text-muted small mb-2">Added {{ item.timestamp|date:"M d, Y" }}</div>
+                    <div class="mb-2">
+                        {% for genre in item.movie.genres|slice:":3" %} {# Show first 3 genres #}
+                           <span class="badge genre-badge small">{{ genre.name }}</span>
+                        {% endfor %}
                     </div>
-                    <div class="action-buttons">
+                    <div class="action-buttons mt-auto d-flex justify-content-between">
                         <button class="btn btn-sm btn-outline-danger btn-animated remove-btn" 
                                 data-movie-id="{{ item.movie.tmdb_id }}">
                             <i class="fas fa-trash-alt"></i> Remove
@@ -432,6 +442,10 @@
                         return $(a).data('title').localeCompare($(b).data('title'));
                     case 'title-desc':
                         return $(b).data('title').localeCompare($(a).data('title'));
+                    case 'rating-desc': 
+                        return $(b).data('rating') - $(a).data('rating');
+                    case 'rating-asc':
+                        return $(a).data('rating') - $(b).data('rating');
                     default:
                         return 0;
                 }

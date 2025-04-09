@@ -16,6 +16,12 @@ body {
     color: #333;
 }
 
+/* Prevent scrollbar from appearing
+html, body {
+    overflow: hidden;
+} 
+*/
+
 /* Navbar customization */
 .navbar-dark {
     background-color: var(--dark-color) !important;
@@ -29,11 +35,28 @@ body {
 /* Card shadowing and transitions */
 .card {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    border: 1px solid #dee2e6;
+    height: 100%;
 }
 
 .card:hover {
     box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    transform: translateY(-3px);
+}
+
+.card-body {
+    padding: 15px; 
+    display: flex;
+    flex-direction: column;
+}
+
+.card-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Buttons and interactive elements */
@@ -97,62 +120,6 @@ body {
     opacity: 0.7;
     cursor: not-allowed;
 }
-
-/* from details page */
-
-.cast-section {
-    margin-top: 1.5rem;
-    padding: 1.5rem;
-    background-color: var(--light-color);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-}
-.cast-section .section-heading { /* Override default if needed */
-    margin-top: 0;
-    border-bottom: none;
-    padding-bottom: 0;
-}
-.cast-item { /* New class for individual cast member div */
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-}
-.cast-item img {
-    width: 45px; /* Keep size reasonable */
-    height: 45px;
-    border-radius: 50%;
-    margin-right: 10px;
-    object-fit: cover;
-}
-.cast-item .placeholder-img { /* Placeholder div if no image */
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    background-color: var(--muted-text-color);
-    margin-right: 10px;
-    display: inline-block;
-}
-.cast-item .cast-info {
-    font-size: 0.9rem;
-    line-height: 1.2;
-}
-.cast-item .cast-info .character {
-    color: var(--muted-text-color);
-    font-size: 0.8rem;
-}
-
-/* Active State for Detail Page Buttons */
-.movie-actions .btn.button-active-state {
-    font-weight: bold;
-    border-width: 2px;
-    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), .3); /* Subtle glow */
-    /* Add specific background/color if needed */
-}
-.movie-actions .btn.button-active-state.btn-success { /* Example for watchlist */
-     background-color: var(--btn-success-bg);
-     color: white; /* Ensure text contrast */
-}
-
 
 @keyframes spin {
     to { transform: rotate(360deg); }
