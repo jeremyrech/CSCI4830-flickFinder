@@ -15,8 +15,8 @@ class Movie(models.Model):
     overview = models.TextField(null=True, blank=True)
     release_date = models.DateField(null=True, blank=True)
     vote_average = models.FloatField(null=True, blank=True)
-    vote_count = models.IntegerField(null=True, blank=True)
-    genres = models.JSONField(null=True, blank=True)
+    vote_count = models.IntegerField(null=True, blank=True, help_text="Should have minimum of 100 votes")
+    genres = models.JSONField(null=True, blank=True, help_text="List of genre dicts, e.g., [{'id': 28, 'name': 'Action'}]")
     
     def __str__(self):
         return self.title
