@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -126,6 +127,40 @@ STATICFILES_DIRS = [
 # Media files settings
 #MEDIA_URL = '/media/'
 #MEDIA_ROOT = BASE_DIR / 'media'
+
+# Logger in dictConfig format
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    'formatters': { # Define how log messages look
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{', # Use '{' style formatting
+        },
+        'simple': {
+            'format': '{levelname} {asctime} {module}: {message}',
+            'style': '{',
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        'flickFinder': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 #TMDB
 TMDB_API_KEY = 'c9dababb5ed8cf9eebe65b78ac89a7b8'
