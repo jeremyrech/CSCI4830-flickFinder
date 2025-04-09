@@ -60,7 +60,7 @@ class TMDBService:
                   'include_adult': 'false',
                   'include_video': 'false',
                   'with_original_language': 'en',
-                  'vote_count.gte': 100
+                  'vote_count.gte': 200
         } # vote count prevents randoms
         
         if filters:
@@ -101,7 +101,7 @@ class TMDBService:
             'include_adult': 'false',
             'include_video': 'false',
             'with_original_language': 'en',
-            'vote_count.gte': 100
+            'vote_count.gte': 200
         }
         
         # Fetch movies from discovery endpoint
