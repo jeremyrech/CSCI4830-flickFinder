@@ -62,6 +62,23 @@ body {
     border-color: var(--warning-color);
 }
 
+.feedback-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.75); /* Semi-transparent background */
+    color: #fff; /* Light text */
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    z-index: 110; /* Above movie card, below modals */
+    display: none; /* Hidden by default */
+    text-align: center;
+    white-space: nowrap;
+}
+
 /* Animation for loading states */
 .loading-spinner {
     width: 40px;

@@ -114,7 +114,9 @@
             <p><i class="fas fa-hand-pointer"></i> Swipe left to skip, swipe right to add to watchlist</p>
         </div>
         
-        <div class="movie-container-wrapper">
+        <div class="movie-container-wrapper position-relative">
+            <div id="feedback-overlay" class="feedback-overlay" style="display: none;">Action Placeholder</div>
+            
             <div id="movieContainer" class="movie-card">
                 <a href="{% url 'movie_detail' movie.id %}" class="poster-link">
                     <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
@@ -262,6 +264,13 @@
     const $saveFiltersButton = $('#saveFilters');
     const $clearFiltersButton = $('#clearFilters');
     const $filtersModal = $('#filtersModal');
+    const $feedbackOverlay = $('#feedback-overlay');
+
+    function showFeedback(message) {
+        if (!$feedbackOverlay.length) return; // Exit if overlay doesn't exist
+
+        $feedbackOverlay.text(message).fadeIn(200).delay(600).fadeOut(200);
+    }
 
     function disableUI(showSpinner = false, button = null) {
         isTransitioning = true;
@@ -437,7 +446,7 @@
             // Fallback: simple fade out
             console.log("Swipe animation function not found, relying on standard fade.");
         }
-
+        
         $.ajax({
             url: '{% url "movie_interaction" %}',
             type: 'POST',
@@ -447,6 +456,16 @@
                 'csrfmiddlewaretoken': $('input[name="csrfmiddlewaretoken"]').val()
             },
             success: function(response) {
+                let feedbackMsg = '';
+                switch(action) {
+                    case 'watchlist': feedbackMsg = 'Added to Watchlist'; break;
+                    case 'heart': feedbackMsg = 'Favorited'; break;
+                    case 'skip': feedbackMsg = 'Skipped'; break;
+                    case 'block': feedbackMsg = 'Blocked'; break;
+                    default: feedbackMsg = 'Action Recorded';
+                }
+                showFeedback(feedbackMsg);
+
                 if (response.status === 'success' && response.next_movie) {
                     nextMovieData = response.next_movie;
                     if (nextMovieData.poster_path) {
