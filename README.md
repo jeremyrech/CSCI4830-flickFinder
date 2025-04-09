@@ -28,9 +28,14 @@ UserFilter: <QuerySet [(user, genre_ids, min_release_year, max_release_year, min
 
 ## Contributors
 
-Jeremy
-Anhphat
-Joe
-Aiden
-Will
-Hekima
+**Jeremy**
+
+**Anhphat**
+
+**Joe**
+
+**Aiden**
+
+**Will**
+
+**Hekima**
