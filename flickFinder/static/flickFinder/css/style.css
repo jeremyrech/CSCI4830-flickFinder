@@ -89,6 +89,71 @@ body {
     animation: spin 1s ease-in-out infinite;
 }
 
+.spinner-border-sm { /* Use Bootstrap's spinner */
+    margin-right: 5px;
+}
+
+.button-loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* from details page */
+
+.cast-section {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background-color: var(--light-color);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+.cast-section .section-heading { /* Override default if needed */
+    margin-top: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.cast-item { /* New class for individual cast member div */
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+.cast-item img {
+    width: 45px; /* Keep size reasonable */
+    height: 45px;
+    border-radius: 50%;
+    margin-right: 10px;
+    object-fit: cover;
+}
+.cast-item .placeholder-img { /* Placeholder div if no image */
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background-color: var(--muted-text-color);
+    margin-right: 10px;
+    display: inline-block;
+}
+.cast-item .cast-info {
+    font-size: 0.9rem;
+    line-height: 1.2;
+}
+.cast-item .cast-info .character {
+    color: var(--muted-text-color);
+    font-size: 0.8rem;
+}
+
+/* Active State for Detail Page Buttons */
+.movie-actions .btn.button-active-state {
+    font-weight: bold;
+    border-width: 2px;
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), .3); /* Subtle glow */
+    /* Add specific background/color if needed */
+}
+.movie-actions .btn.button-active-state.btn-success { /* Example for watchlist */
+     background-color: var(--btn-success-bg);
+     color: white; /* Ensure text contrast */
+}
+
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
