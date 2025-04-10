@@ -8,10 +8,10 @@ The current project scope takes advantage of free APIs and AWS trial instances i
 
 ## Requirements
 
-```python
-asgiref==3.8.1
+```
+﻿asgiref==3.8.1
 Django==5.1.6
-logging==0.4.9.6
+python-dotenv==1.1.0
 requests==2.32.3
 sqlparse==0.5.3
 tzdata==2025.1
@@ -30,7 +30,7 @@ UserFilter: <QuerySet [(user, genre_ids, min_release_year, max_release_year, min
 
 **Jeremy**
 
-**Anhphat**
+**AnhPhat**
 
 **Joe**
 
