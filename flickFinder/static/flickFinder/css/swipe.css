@@ -1,0 +1,114 @@
+/*I think first few are not needed but I'm not sure*/
+.movie-card {
+    position: relative;
+    transition: transform 0.1s ease;
+    cursor: grab;
+    touch-action: none;
+    z-index: 10;
+    backface-visibility: hidden;
+}
+
+.movie-card.dragging {
+    cursor: grabbing;
+    z-index: 100;
+}
+
+.movie-container-wrapper {
+    position: relative;
+    width: 100%;
+    height: auto;
+    min-height: 500px;
+}
+
+/* Next movie container positioning */
+#nextMovieContainer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    opacity: 0;
+    z-index: 5;
+    pointer-events: none;
+    border-radius: 10px; 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    overflow: hidden; 
+    background-color: #fff;
+}
+
+/* Swipe cue styling */
+.swipe-cue {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    font-size: 36px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20; /* Above the movie card */
+    color: white;
+    pointer-events: none; /* Don't interfere with clicks */
+}
+
+.swipe-left {
+    left: 20px;
+    background-color: rgba(220, 53, 69, 0.8); 
+}
+
+.swipe-right {
+    right: 20px;
+    background-color: rgba(40, 167, 69, 0.8); 
+}
+
+/* Animation for swipe exit */
+@keyframes swipeLeftOut {
+    to {
+        transform: translateX(-200%) rotate(-30deg);
+    }
+}
+
+@keyframes swipeRightOut {
+    to {
+        transform: translateX(200%) rotate(30deg);
+    }
+}
+
+.swipe-left-out {
+    animation: swipeLeftOut 0.5s forwards;
+}
+
+.swipe-right-out {
+    animation: swipeRightOut 0.5s forwards;
+}
+
+/* Animation for new card entry */
+@keyframes cardEntryAnimation {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.card-entry {
+    animation: cardEntryAnimation 0.3s ease-out;
+}
+
+/* Prevent interaction during exit animation */
+.card-exit {
+    pointer-events: none !important;
+}
+
+/* Ensure you can see card */
+#movieContainer, #nextMovieContainer {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform-style: preserve-3d;
+} 

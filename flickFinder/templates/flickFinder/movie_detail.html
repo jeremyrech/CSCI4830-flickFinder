@@ -1,6 +1,6 @@
 {% extends 'flickFinder/base.html' %}
 
-{% block title %}{{ movie.title }} - FlickFinder{% endblock %}
+{% block title %}{{ movie_data.title }} - FlickFinder{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -53,21 +53,72 @@
         margin-top: 20px;
     }
     
-    .section-heading {
-        margin-top: 30px;
-        margin-bottom: 15px;
-        border-bottom: 1px solid #000000;
-        padding-bottom: 10px;
+    .section-heading { 
+        border-bottom: 1px solid #dee2e6; 
+    }
+
+    .cast-section {
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+        background-color: #f5f5f5;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+    .cast-section .section-heading { /* Override default if needed */
+        margin-top: 0;
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    .cast-item {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+    }
+    .cast-item img {
+        width: 45px; /* Keep size reasonable */
+        height: 45px;
+        border-radius: 50%;
+        margin-right: 10px;
+        object-fit: cover;
+    }
+    .cast-item .placeholder-img { /* Placeholder div if no image */
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background-color: #6c757d;
+        margin-right: 10px;
+        display: inline-block;
+    }
+    .cast-item .cast-info {
+        font-size: 0.9rem;
+        line-height: 1.2;
+    }
+    .cast-item .cast-info .character {
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+
+    /* Active State for Detail Page Buttons */
+    .movie-actions .btn.button-active-state {
+        font-weight: bold;
+        border-width: 2px;
+        box-shadow: 0 0 0 0.2rem rgba(30, 136, 229, .3); /* Subtle glow */
+        /* Add specific background/color if needed */
+    }
+    .movie-actions .btn.button-active-state.btn-success {
+        background-color: #43a047;
+        color: white; /* Ensure text contrast */
     }
     
     .genre-badge {
+        display: inline-block;
         background-color: #e9ecef;
         color: #495057;
-        padding: 5px 10px;
-        border-radius: 15px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
         margin-right: 5px;
         margin-bottom: 5px;
-        display: inline-block;
     }
     
     @media (max-width: 767px) {
@@ -87,48 +138,35 @@
 {% block content %}
 <!-- Movie Backdrop -->
 <div class="movie-backdrop mb-4" 
-     style="background-image: url('https://image.tmdb.org/t/p/w1280{{ movie.backdrop_path }}');">
+     style="background-image: url('https://image.tmdb.org/t/p/w1280{{ movie_data.backdrop_path }}');">
 </div>
 
 <div class="container">
     <div class="row">
         <!-- Movie Poster -->
         <div class="col-md-4 movie-poster-container">
-            <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
-                 alt="{{ movie.title }}" class="movie-poster">
+            <img src="https://image.tmdb.org/t/p/w500{{ movie_data.poster_path }}" 
+                 alt="{{ movie_data.title }}" class="movie-poster">
                  
             <!-- Movie Actions (only shown for authenticated users) -->
             {% if user.is_authenticated %}
             <div class="movie-actions d-grid gap-2 mt-3">
-                {% if user_interaction and user_interaction.interaction_type == 'heart' %}
-                <button class="btn btn-danger" data-action="unheart" data-movie-id="{{ movie.id }}">
-                    <i class="fas fa-heart"></i> Remove from Favorites
+                {% with current_interaction=user_interaction.interaction_type|default:'' %}
+                <button class="btn {% if current_interaction == 'heart' %}btn-danger button-active-state{% else %}btn-outline-danger{% endif %}"
+                        data-action="{% if current_interaction == 'heart' %}unheart{% else %}heart{% endif %}" data-movie-id="{{ movie_data.id }}">
+                    <i class="{% if current_interaction == 'heart' %}fas{% else %}far{% endif %} fa-heart me-2"></i> {% if current_interaction == 'heart' %}Favorited{% else %}Favorite{% endif %}
                 </button>
-                {% else %}
-                <button class="btn btn-outline-danger" data-action="heart" data-movie-id="{{ movie.id }}">
-                    <i class="far fa-heart"></i> Add to Favorites
+
+                <button class="btn {% if current_interaction == 'watchlist' %}btn-success button-active-state{% else %}btn-outline-success{% endif %}"
+                        data-action="{% if current_interaction == 'watchlist' %}unwatchlist{% else %}watchlist{% endif %}" data-movie-id="{{ movie_data.id }}">
+                    <i class="fas {% if current_interaction == 'watchlist' %}fa-check{% else %}fa-plus{% endif %} me-2"></i> {% if current_interaction == 'watchlist' %}On Watchlist{% else %}Add to Watchlist{% endif %}
                 </button>
-                {% endif %}
-                
-                {% if user_interaction and user_interaction.interaction_type == 'watchlist' %}
-                <button class="btn btn-success" data-action="unwatchlist" data-movie-id="{{ movie.id }}">
-                    <i class="fas fa-check"></i> In Your Watchlist
+
+                <button class="btn {% if current_interaction == 'block' %}btn-warning button-active-state{% else %}btn-outline-warning{% endif %}"
+                        data-action="{% if current_interaction == 'block' %}unblock{% else %}block{% endif %}" data-movie-id="{{ movie_data.id }}">
+                    <i class="fas fa-ban me-2"></i> {% if current_interaction == 'block' %}Unblock{% else %}Block{% endif %}
                 </button>
-                {% else %}
-                <button class="btn btn-outline-success" data-action="watchlist" data-movie-id="{{ movie.id }}">
-                    <i class="fas fa-plus"></i> Add to Watchlist
-                </button>
-                {% endif %}
-                
-                {% if user_interaction and user_interaction.interaction_type == 'block' %}
-                <button class="btn btn-warning" data-action="unblock" data-movie-id="{{ movie.id }}">
-                    <i class="fas fa-ban"></i> Unblock Movie
-                </button>
-                {% else %}
-                <button class="btn btn-outline-warning" data-action="block" data-movie-id="{{ movie.id }}">
-                    <i class="fas fa-ban"></i> Block for 3 Days
-                </button>
-                {% endif %}
+                {% endwith %}
             </div>
             {% else %}
             <div class="alert alert-info mt-3">
@@ -139,50 +177,52 @@
         
         <!-- Movie Details -->
         <div class="col-md-8 movie-details">
-            <h1 class="movie-title">{{ movie.title }}</h1>
+            <h1 class="movie-title">{{ movie_data.title }}</h1>
             
             <div class="movie-meta">
-                <span>{{ movie.release_date|date:"Y" }}</span> • 
-                <span>{{ movie.runtime }} min</span> • 
-                <span>{{ movie.vote_average }}/10 ({{ movie.vote_count }} votes)</span>
+                <span>{{ movie_data.release_date }}</span> • 
+                <span>{% if movie_data.runtime %} {{ movie_data.runtime }} min{% endif %}</span> • 
+                <span>{{ movie_data.vote_average|floatformat:1 }}/10 ({{ movie_data.vote_count }} votes)</span>
             </div>
             
-            {% if movie.tagline %}
-            <p class="fst-italic">{{ movie.tagline }}</p>
+            {% if movie_data.tagline %}
+            <p class="fst-italic">{{ movie_data.tagline }}</p>
             {% endif %}
             
             <h4 class="section-heading">Overview</h4>
-            <p>{{ movie.overview }}</p>
+            <p>{{ movie_data.overview }}</p>
             
-            {% if movie.genres %}
+            {% if movie_data.genres %}
             <h4 class="section-heading">Genres</h4>
             <div>
-                {% for genre in movie.genres %}
+                {% for genre in movie_data.genres %}
                 <span class="genre-badge">{{ genre.name }}</span>
                 {% endfor %}
             </div>
             {% endif %}
             
             <!-- I don't think the movie.credits is ever there, I'll fix later -->
-            {% if movie.credits %}
-            <h4 class="section-heading">Cast</h4>
-            <div class="row">
-                {% for cast in movie.credits.cast|slice:":6" %}
-                <div class="col-md-4 col-6 mb-3">
-                    <div class="d-flex align-items-center">
-                        {% if cast.profile_path %}
-                        <img src="https://image.tmdb.org/t/p/w45{{ cast.profile_path }}" 
-                             alt="{{ cast.name }}" class="rounded-circle me-2" width="45">
-                        {% else %}
-                        <div class="rounded-circle bg-secondary me-2" style="width: 45px; height: 45px;"></div>
-                        {% endif %}
-                        <div>
-                            <div>{{ cast.name }}</div>
-                            <small class="text-muted">{{ cast.character }}</small>
+            {% if movie_data.credits and movie_data.credits.cast %}
+            <div class="cast-section">
+                <h4 class="section-heading">Cast</h4>
+                <div class="row">
+                    {% for cast in movie_data.credits.cast|slice:":6" %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="cast-item">
+                            {% if cast.profile_path %}
+                            <img src="https://image.tmdb.org/t/p/w92{{ cast.profile_path }}" 
+                                alt="{{ cast.name }}">
+                            {% else %}
+                            <div class="placeholder-img"></div>
+                            {% endif %}
+                            <div class="cast-info">
+                                <div>{{ cast.name }}</div>
+                                <div class="character">{{ cast.character }}</div>
+                            </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
             {% endif %}
         </div>
@@ -196,15 +236,21 @@
         // Handle movie interactions
         // probably should move this to the main.js and import to share between this and index
         $('.movie-actions button').click(function() {
+            const $button = $(this);
             const movieId = $(this).data('movie-id');
             const action = $(this).data('action');
+            const isUnAction = action.startsWith('un');
+            const interactionType = action.replace('un', '');
+
+            $button.prop('disabled', true).addClass('button-loading');
+            $button.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Working...');
             
             $.ajax({
                 url: '{% url "movie_interaction" %}',
                 type: 'POST',
                 data: {
                     'movie_id': movieId,
-                    'interaction_type': action.replace('un', ''),
+                    'interaction_type': interactionType,
                     'csrfmiddlewaretoken': '{{ csrf_token }}'
                 },
                 success: function() {
@@ -213,6 +259,7 @@
                 },
                 error: function() {
                     alert('An error occurred. Please try again.');
+                    $button.prop('disabled', false).removeClass('button-loading');
                 }
             });
         });

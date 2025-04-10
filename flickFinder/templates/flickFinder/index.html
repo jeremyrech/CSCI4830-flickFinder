@@ -4,14 +4,16 @@
 {% block title %}FlickFinder - Discover Movies{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'flickFinder/css/swipe.css' %}"> <!-- I pity the man who has to condense down the css and js-->
 <style>
     .movie-card {
         position: relative;
-        height: 80vh;
-        max-height: 600px;
+        height: 96vh;
+        max-height: 720px; 
         overflow: hidden;
         border-radius: 10px;
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        backface-visibility: hidden;
     }
     
     .movie-poster {
@@ -46,7 +48,17 @@
         font-size: 24px;
         transition: all 0.3s;
     }
-    
+
+    .action-btn:active { 
+        transform: scale(0.95); 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .action-btn:disabled { 
+        pointer-events: none;
+        opacity: 0.6;
+    }
+
     .action-btn:hover {
         transform: scale(1.1);
     }
@@ -60,7 +72,29 @@
     
     .no-movies {
         text-align: center;
-        padding: 100px 0;
+        padding: 80px 20px;
+        color: #6c757d;
+    }
+
+    .no-movies h3 { 
+        margin-bottom: 15px; 
+        font-weight: 300; 
+    }
+    
+    /* Swipe instructions */
+    .swipe-instructions {
+        text-align: center;
+        margin-bottom: 10px;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    /* add again, make sure this exists */
+    #movieContainer {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        height: 100%;
     }
 </style>
 {% endblock %}
@@ -76,15 +110,27 @@
         </div>
         
         {% if movie %}
-        <div id="movieContainer" class="movie-card">
-            <a href="{% url 'movie_detail' movie.id %}">
-                <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
-                     alt="{{ movie.title }}" class="movie-poster">
-            </a>
-            <div class="movie-info">
-                <h3>{{ movie.title }}</h3>
-                <p>{{ movie.release_date|slice:"0:4" }} | {{ movie.vote_average }}/10</p>
-                <p class="movie-overview">{{ movie.overview|truncatechars:150 }}</p>
+        <div class="swipe-instructions">
+            <p><i class="fas fa-hand-pointer"></i> Swipe left to skip, swipe right to add to watchlist</p>
+        </div>
+        
+        <div class="movie-container-wrapper position-relative">
+            <div id="feedback-overlay" class="feedback-overlay" style="display: none;">Action Placeholder</div>
+            
+            <div id="movieContainer" class="movie-card">
+                <a href="{% url 'movie_detail' movie.id %}" class="poster-link">
+                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
+                         alt="{{ movie.title }}" class="movie-poster" draggable="false">
+                </a>
+                <div class="movie-info">
+                    <h3>{{ movie.title }}</h3>
+                    <p>{{ movie.release_date|slice:"0:4" }} | {{ movie.vote_average|floatformat:1 }}/10</p>
+                    <p class="movie-overview">{{ movie.overview|truncatechars:150 }}</p>
+                </div>
+            </div>
+            
+            <div id="nextMovieContainer" class="movie-card">
+                <!-- Next movie will be loaded here -->
             </div>
         </div>
         
@@ -104,15 +150,21 @@
         </div>
         {% else %}
         <div class="no-movies">
-            <h3>No movies found</h3>
-            <p>Try adjusting your filters or check back later.</p>
+            <h3>{% if user.is_authenticated %}No Movies Found{% else %}Welcome!{% endif %}</h3>
+            <p id="noMoviesMessage">
+                {% if user.is_authenticated %}
+                Try adjusting your <a href="#" data-bs-toggle="modal" data-bs-target="#filtersModal">filters</a> or check back later.
+                {% else %}
+                Please <a href="{% url 'login' %}">log in</a> to discover movies.
+                {% endif %}
+            </p>
         </div>
         {% endif %}
     </div>
 </div>
 
 <!-- Filters Modal -->
-<!-- most of this genre id stuff does not work -->
+{% if user.is_authenticated %}
 <div class="modal fade" id="filtersModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -121,6 +173,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                {% if filter_form %}
                 <form id="filterForm" method="post" action="{% url 'save_filters' %}">
                     {% csrf_token %}
                     <div class="mb-3">
@@ -131,7 +184,7 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="genre_ids" 
                                            value="{{ genre_id }}" id="genre_{{ genre_id }}"
-                                           {% if genre_id in filter_form.genre_ids.value %}checked{% endif %}>
+                                           {% if genre_id|stringformat:"s" in filter_form.instance.genre_ids %}checked{% endif %}>
                                     <label class="form-check-label" for="genre_{{ genre_id }}">
                                         {{ genre_name }}
                                     </label>
@@ -145,121 +198,385 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="id_min_release_year" class="form-label">Min Year</label>
-                                <input type="number" class="form-control" id="id_min_release_year" 
-                                       name="min_release_year" min="1900" max="2030"
-                                       value="{{ filter_form.min_release_year.value|default_if_none:'' }}">
+                                {{ filter_form.min_release_year }} {# Render form field directly #}
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="id_max_release_year" class="form-label">Max Year</label>
-                                <input type="number" class="form-control" id="id_max_release_year" 
-                                       name="max_release_year" min="1900" max="2030"
-                                       value="{{ filter_form.max_release_year.value|default_if_none:'' }}">
+                                {{ filter_form.max_release_year }} {# Render form field directly #}
                             </div>
                         </div>
                     </div>
                     
                     <div class="mb-3">
                         <label for="id_min_rating" class="form-label">Minimum Rating</label>
-                        <input type="number" class="form-control" id="id_min_rating" 
-                               name="min_rating" min="0" max="10" step="0.5"
-                               value="{{ filter_form.min_rating.value|default_if_none:'' }}">
+                        {{ filter_form.min_rating }} {# Render form field directly #}
                     </div>
+                    {% if filter_form.errors %}
+                    <div class="alert alert-danger">
+                        Please correct the errors below:<br>
+                        {{ filter_form.non_field_errors }}
+                        {% for field in filter_form %}
+                            {% if field.errors %}<div><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</div>{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </form>
+                {% else %}
+                <p>Filter form not available.</p>
+                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveFilters">Apply Filters</button>
+                <button type="button" class="btn btn-outline-secondary" id="clearFilters">Clear All Filters</button>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'flickFinder/js/swipe.js' %}"></script>
 <script>
-    $(document).ready(function() {
-        // Handle movie interactions (heart, block, watchlist, skip)
-        $('.action-btn').click(function() {
-            const movieId = $(this).data('movie-id');
-            const action = $(this).data('action');
-            
-            $.ajax({
-                url: '{% url "movie_interaction" %}',
-                type: 'POST',
-                data: {
-                    'movie_id': movieId,
-                    'interaction_type': action,
-                    'csrfmiddlewaretoken': '{{ csrf_token }}'
-                },
-                success: function(response) {
-                    if (response.status === 'success') {
-                        // Update the UI with the next movie
-                        updateMovieDisplay(response.next_movie);
-                    } else if (response.status === 'no_more_movies') {
-                        // Show a message when no more movies are available
-                        $('#movieContainer').html('<div class="no-movies"><h3>No more movies</h3><p>' + 
-                                                 response.message + '</p></div>');
-                        $('.movie-actions').hide();
-                    }
-                },
-                error: function() {
-                    alert('An error occurred. Please try again.');
-                }
-            });
-        });
-        
-        // Handle filter form submission
-        $('#saveFilters').click(function() {
-            $.ajax({
-                url: '{% url "save_filters" %}',
-                type: 'POST',
-                data: $('#filterForm').serialize(),
-                success: function(response) {
-                    if (response.status === 'success') {
-                        // Close the modal and refresh the page to load new movies
-                        $('#filtersModal').modal('hide');
-                        location.reload();
-                    } else {
-                        // Show validation errors
-                        alert('Please correct the errors in the form.');
-                    }
-                },
-                error: function() {
-                    alert('An error occurred. Please try again.');
-                }
-            });
-        });
-        
-        // Function to update the movie display with new movie data
-        function updateMovieDisplay(movie) {
-            if (!movie) return;
-            
-            const posterUrl = movie.poster_path ? 
-                `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 
-                '{% static "flickFinder/images/no-poster.jpg" %}';
-                // add this later
-                
-            const releaseYear = movie.release_date ? 
-                new Date(movie.release_date).getFullYear() : 'N/A';
-                
-            const movieHtml = `
-                <a href="/movie/${movie.id}/">
-                    <img src="${posterUrl}" alt="${movie.title}" class="movie-poster">
-                </a>
-                <div class="movie-info">
-                    <h3>${movie.title}</h3>
-                    <p>${releaseYear} | ${movie.vote_average}/10</p>
-                    <p class="movie-overview">${movie.overview ? movie.overview.substring(0, 150) + '...' : ''}</p>
-                </div>
-            `;
-            
-            $('#movieContainer').html(movieHtml);
-            
-            // Update action buttons with new movie ID
-            $('.action-btn').data('movie-id', movie.id);
+// the death of all reason, do not ask why main.js is still empty, I don't know where things go
+(function($) {
+    'use strict';
+
+    let isTransitioning = false; // Track if currently in movie transition
+    let nextMovieData = null;
+    let hasSwiped = false; // Track if user has swiped to prevent navigation
+
+    // commonly used timeout values
+    const FADE_OUT_DURATION = 200;
+    const FADE_IN_DURATION = 300;
+    const TRANSITION_DELAY = 300;
+
+    // DOM elements for jquery, values for readability and condensation later, yes I'm talking to you
+    const $document = $(document);
+    const $movieContainer = $('#movieContainer');
+    const $nextMovieContainer = $('#nextMovieContainer');
+    const $movieActions = $('.movie-actions');
+    const $actionButtons = $('.action-btn');
+    const $filterForm = $('#filterForm');
+    const $saveFiltersButton = $('#saveFilters');
+    const $clearFiltersButton = $('#clearFilters');
+    const $filtersModal = $('#filtersModal');
+    const $feedbackOverlay = $('#feedback-overlay');
+
+    function showFeedback(message) {
+        if (!$feedbackOverlay.length) return; // Exit if overlay doesn't exist
+
+        $feedbackOverlay.text(message).fadeIn(200).delay(600).fadeOut(200);
+    }
+
+    function disableUI(showSpinner = false, button = null) {
+        isTransitioning = true;
+        $actionButtons.prop('disabled', true);
+        $movieContainer.addClass('card-exit'); // Prevent clicks on current card during exit
+        if (showSpinner && button) {
+            $(button).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Applying...');
         }
+    }
+
+    function enableUI(clearSpinner = false, button = null, buttonText = 'Apply Filters') {
+        $actionButtons.prop('disabled', false);
+        $movieContainer.removeClass('card-exit dragging'); // Ensure interaction is possible again
+        isTransitioning = false;
+        if (clearSpinner && button) {
+             $(button).prop('disabled', false).html(buttonText);
+        }
+    }
+
+    function resetTransitionState(resetSwipe = true) {
+        console.log("Resetting transition state."); // Debug
+        isTransitioning = false;
+        if(resetSwipe) {
+            hasSwiped = false;
+        }
+        nextMovieData = null; // Clear data, ready for next interaction
+    }
+
+    function displayEOL(message, source = 'interaction') {
+        const defaultMessage = source === 'filter' ? 'No movies match filters. Try adjusting your filters.' : 'No more movies found.';
+        const displayMessage = message || defaultMessage;
+        const title = source === 'filter' ? 'No Matches Found' : 'End of the Line!';
+
+        $movieContainer
+            .html(`<div class="no-movies"><h3>${title}</h3><p>${displayMessage}</p></div>`)
+            .stop(true, true) // Stop any animation
+            .css('opacity', 1)
+            .removeClass('card-exit'); // Clean up classes
+        $movieActions.hide();
+        $nextMovieContainer.html(''); // Clear stage
+        resetTransitionState();
+        enableUI();
+    }
+
+    function preloadImage(url) {
+        console.log("Preloading image:", url); // Debug
+        const img = new Image();
+        img.src = url;
+    }
+
+    function prepareNextMovie(movie) {
+        if (!movie || !movie.id) {
+            console.error("prepareNextMovie called with invalid movie data:", movie);
+            $nextMovieContainer.html('<p>Error loading movie data.</p>');
+            return false;
+        }
+        console.log("prepareNextMovie called for:", movie.title); // Debug
+
+        const posterUrl = movie.poster_path
+            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+             // REMINDER need to add this to the static folder
+            : "{% static 'flickFinder/images/no-poster.jpg' %}";
+
+        const releaseYear = movie.release_date
+            ? movie.release_date.substring(0, 4) // Safer substring
+            : 'N/A';
+
+        const voteAvg = movie.vote_average != null ? movie.vote_average.toFixed(1) : 'N/A'; // Format vote avg, check for null
+
+        const overviewText = movie.overview
+             ? movie.overview.substring(0, 150) + (movie.overview.length > 150 ? '...' : '')
+             : 'No overview available.';
+
+        const movieHtml = `
+            <a href="/movie/${movie.id}/" class="poster-link">
+                <img src="${posterUrl}" alt="${movie.title}" class="movie-poster" draggable="false">
+            </a>
+            <div class="movie-info">
+                <h3>${movie.title}</h3>
+                <p>${releaseYear} | ${voteAvg}/10</p>
+                <p class="movie-overview">${overviewText}</p>
+            </div>
+            <div class="swipe-cue swipe-left" style="opacity: 0;"><i class="fas fa-times"></i></div>
+            <div class="swipe-cue swipe-right" style="opacity: 0;"><i class="fas fa-plus"></i></div>
+        `;
+
+        // Set the HTML for next movie container
+        $nextMovieContainer.html(movieHtml).css({
+             'opacity': 0, 'transform': 'none', 'transition': 'none',
+             'display': 'block', 'z-index': 5, 'pointer-events': 'none'
+         });
+        console.log("#nextMovieContainer prepared."); // Debug
+        return true;
+    }
+
+    function showNextMovie() {
+        console.log("showNextMovie called. nextMovieData:", nextMovieData); // Debug
+
+        if (!nextMovieData) {
+            console.error("Cannot show next movie: nextMovieData is null or undefined.");
+            displayEOL("Could not load the next movie data.", 'error')
+            resetTransitionState();
+            enableUI();
+            return;
+        }
+
+        if ($nextMovieContainer.is(':empty')) {
+            console.error("prepareNextMovie did not populate #nextMovieContainer correctly before showNextMovie.");
+            prepareNextMovie(nextMovieData);
+            if (!prepareNextMovie(nextMovieData)) {
+                displayEOL("Failed preparing next movie display.", 'error');
+                resetTransitionState();
+                enableUI();
+                return;
+            }
+        }
+
+        // Fade out current card
+        $movieContainer.stop(true, true).animate({ opacity: 0 }, FADE_OUT_DURATION, function() {
+            console.log("Current card faded out."); // Debug
+
+            // Swap content
+            $movieContainer.html($nextMovieContainer.html());
+            $actionButtons.data('movie-id', nextMovieData.id);
+
+            $movieContainer
+                .removeClass('card-exit dragging')
+                .css({ // Explicitly reset position
+                    'transition': 'none', 
+                    'transform': 'none',
+                    'opacity': 0
+                });
+            console.log("Current card HTML updated and styles reset (opacity 0)."); // Debug
+
+            // Clear next card container
+            $nextMovieContainer.html('').attr('style', '');
+
+            // Animate the fade-in of the new container
+            $movieContainer.animate({ opacity: 1 }, FADE_IN_DURATION, function() {
+                console.log("New card fade-in complete."); // Debug
+
+                // Reset swipe functionality AFTER fade-in
+                if (window.movieSwipe?.updateMovieId) {
+                    window.movieSwipe.updateMovieId(nextMovieData.id);
+                } else {
+                    console.warn("window.movieSwipe.updateMovieId not found"); // Debug
+                }
+                resetTransitionState();
+            });
+
+            // Actions that can happen with fade-in:
+            enableUI();
+        });
+    }
+
+    $document.on('click', '.action-btn', function() { // Attach to a static parent
+        if (isTransitioning) {
+            console.log("Interaction blocked: already transitioning."); // Debug
+            return;
+        }
+
+        disableUI();
+        hasSwiped = true;
+
+        const $button = $(this); // Store button reference
+        const movieId = $button.data('movie-id');
+        const action = $button.data('action');
+
+        // Animate swipe for buttons
+        if (window.movieSwipe?.animateSwipe) {
+            window.movieSwipe.animateSwipe(action); // pass interaction type
+        } else {
+            // Fallback: simple fade out
+            console.log("Swipe animation function not found, relying on standard fade.");
+        }
+        
+        $.ajax({
+            url: '{% url "movie_interaction" %}',
+            type: 'POST',
+            data: {
+                'movie_id': movieId,
+                'interaction_type': action,
+                'csrfmiddlewaretoken': $('input[name="csrfmiddlewaretoken"]').val()
+            },
+            success: function(response) {
+                let feedbackMsg = '';
+                switch(action) {
+                    case 'watchlist': feedbackMsg = 'Added to Watchlist'; break;
+                    case 'heart': feedbackMsg = 'Favorited'; break;
+                    case 'skip': feedbackMsg = 'Skipped'; break;
+                    case 'block': feedbackMsg = 'Blocked'; break;
+                    default: feedbackMsg = 'Action Recorded';
+                }
+                showFeedback(feedbackMsg);
+
+                if (response.status === 'success' && response.next_movie) {
+                    nextMovieData = response.next_movie;
+                    if (nextMovieData.poster_path) {
+                        preloadImage(`https://image.tmdb.org/t/p/w500${nextMovieData.poster_path}`);
+                    }
+                    if (prepareNextMovie(nextMovieData)) {
+                        // Show next movie after delay matching fade
+                        setTimeout(showNextMovie, TRANSITION_DELAY);
+                    } else { // Handle errors
+                        displayEOL("Failed to prepare next movie.", 'error');
+                        resetTransitionState();
+                        enableUI();
+                    }
+                } else {
+                    // Handle 'no_more_movies'
+                    setTimeout(() => displayEOL(response.message, 'interaction'), TRANSITION_DELAY)
+                }
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error("Interaction error:", textStatus, errorThrown, jqXHR.responseText); // Log error
+                alert('An error occurred during the interaction. Please try again.');
+                if (window.movieSwipe?.resetCardPosition) {
+                    window.movieSwipe.resetCardPosition();
+                }
+                $movieContainer.stop(true, true).css('opacity', 1); // make sure card visible
+                resetTransitionState();
+                enableUI(); // Re-enable buttons after error
+            }
+        });
     });
+
+    // Handle filter save
+    $saveFiltersButton.click(function() {
+        const $button = $(this);
+        disableUI(true, $button);
+
+        $.ajax({
+            url: '{% url "save_filters" %}',
+            type: 'POST',
+            data: $filterForm.serialize(),
+            success: function(response) {
+                console.log("Save filters AJAX success:", response); // Debug
+                $filtersModal.modal('hide');
+
+                if (response.status === 'success') {
+                    if (response.next_movie) {
+                        hasSwiped = true; // treat filter like a swipe action
+
+                        nextMovieData = response.next_movie;
+                        if (nextMovieData.poster_path) {
+                            preloadImage(`https://image.tmdb.org/t/p/w500${nextMovieData.poster_path}`);
+                        }
+                        if (prepareNextMovie(nextMovieData)) {
+                            showNextMovie();
+                            $movieActions.fadeIn(); // Ensure actions are visible
+                            enableUI(true, $button, 'Apply Filters')
+                        } else {
+                            displayEOL("Failed to prepare first movie after filter.", 'error');
+                            resetTransitionState();
+                            enableUI(true, $button, 'Apply Filters'); // Pass button to reset spinner
+                        }
+                    } else {
+                        // No movie found with new filters
+                        displayEOL(null, 'filter'); // Use specific message for filters
+                        enableUI(true, $button, 'Apply Filters');
+                    }
+                } else {
+                    // Show validation errors
+                    alert('Please correct the errors in the form: ' + JSON.stringify(response.errors));
+                    enableUI(true, $button, 'Apply Filters');
+                    isTransitioning = false; // Allow retry without full state reset
+                    $filtersModal.modal('show');
+                }
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error("Filter save error:", textStatus, errorThrown, jqXHR.responseText);
+                alert('An error occurred while saving filters. Please try again.');
+                $filtersModal.modal('hide');
+                resetTransitionState();
+                enableUI(true, $button, 'Apply Filters'); // Reset button fully on this error
+            },
+        });
+    });
+
+    // Clear filters button
+    $clearFiltersButton.on('click', function() {
+        // Clear form fields visually
+        $filterForm.find('#id_min_release_year').val('');
+        $filterForm.find('#id_max_release_year').val('');
+        $filterForm.find('#id_min_rating').val('');
+        $filterForm.find('input[type="checkbox"]').prop('checked', false); // Ensure checkboxes are cleared
+
+        // Trigger the save action to clear filters on backend and reload movie
+        $saveFiltersButton.click();
+    });
+
+    function init() {
+        $('#movieContainer').css('opacity', 0);
+        if ($('#movieContainer').find('.poster-link').length > 0) {
+            $('#movieContainer').animate({ opacity: 1 }, FADE_IN_DURATION);
+        } else {
+                $('#movieContainer').css('opacity', 1);
+        }
+
+        const csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+        if (!csrfToken) {
+            console.warn('CSRF token input field not found.');
+        }
+    }
+    
+    init();
+})(jQuery);
 </script>
 {% endblock %}

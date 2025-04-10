@@ -16,6 +16,12 @@ body {
     color: #333;
 }
 
+/* Prevent scrollbar from appearing
+html, body {
+    overflow: hidden;
+} 
+*/
+
 /* Navbar customization */
 .navbar-dark {
     background-color: var(--dark-color) !important;
@@ -29,11 +35,28 @@ body {
 /* Card shadowing and transitions */
 .card {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    border: 1px solid #dee2e6;
+    height: 100%;
 }
 
 .card:hover {
     box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    transform: translateY(-3px);
+}
+
+.card-body {
+    padding: 15px; 
+    display: flex;
+    flex-direction: column;
+}
+
+.card-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Buttons and interactive elements */
@@ -62,6 +85,23 @@ body {
     border-color: var(--warning-color);
 }
 
+.feedback-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.75); /* Semi-transparent background */
+    color: #fff; /* Light text */
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    z-index: 110; /* Above movie card, below modals */
+    display: none; /* Hidden by default */
+    text-align: center;
+    white-space: nowrap;
+}
+
 /* Animation for loading states */
 .loading-spinner {
     width: 40px;
@@ -70,6 +110,15 @@ body {
     border-radius: 50%;
     border-top-color: var(--primary-color);
     animation: spin 1s ease-in-out infinite;
+}
+
+.spinner-border-sm { /* Use Bootstrap's spinner */
+    margin-right: 5px;
+}
+
+.button-loading {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
 @keyframes spin {
