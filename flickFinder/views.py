@@ -21,28 +21,55 @@ MAX_TMDB_PAGE = 500
 tmdb_service = TMDBService()
 
 def _get_excluded_ids(user):
-    """ Helper for get_next_movie_for_user to get excluded ids for pre-filtering """
+    """
+    Retrieves a set of TMDB movie IDs that should be excluded for a given user.
+
+    Excludes movies the user has interacted with first, then separately
+    the movies actively blocked (within the last 3 days).
+
+    Args:
+        user (User): The user to retrieve excluded IDs for. From request.user
+
+    Returns:
+        set: A set of TMDB movie IDs to exclude. Returns an empty set on error.
+    """
     try:
-        excluded_interactions = UserMovieInteraction.objects.filter(user=user)
+        excluded_interactions = UserMovieInteraction.objects.filter(user=user).exclude(interaction_type='block')
         excluded_tmdb_ids = set(excluded_interactions.values_list('movie__tmdb_id', flat=True))
         three_days_ago = timezone.now() - timezone.timedelta(days=3)
         actively_blocked_ids = set(UserMovieInteraction.objects.filter(
-            user=user, interaction_type='block', timestamp__gte=three_days_ago
+            user=user,
+            interaction_type='block',
+            timestamp__gte=three_days_ago
         ).values_list('movie__tmdb_id', flat=True))
+        logger.debug(f"User {user.id} actively blocked IDs: {len(actively_blocked_ids)}")
         excluded_tmdb_ids.update(actively_blocked_ids)
-        logger.debug(f"User {user.id} excluded IDs count: {len(excluded_tmdb_ids)}")
+        logger.debug(f"User {user.id} total excluded IDs count: {len(excluded_tmdb_ids)}")
         return excluded_tmdb_ids
     except Exception as e:
         logger.exception(f"Error retrieving excluded interactions for user {user.id}, {e}")
         return set() # Return empty set on error
 
 def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass request for session, death death death
-    """ Attempts to serve from cache first. If cache is empty, fetches a batch"""
+    """
+    Gets the next movie recommendation for the logged-in* user.
+
+    Attempts to serve from a per-user session cache first. If the cache is
+    empty or exhausted, fetches a new batch of potential movies from TMDB
+    from filters primarily, but goes to popular if none available, filters out excluded movies,
+    caches the results, and returns the first movie from the new batch.
+
+    Args:
+        request (HttpRequest): The incoming HTTP request object (used for user and session).
+        tmdb_service (TMDBService): An instance of the TMDB service.
+
+    Returns:
+        dict: A dictionary containing TMDB movie data for the next recommendation,
+              or None if no suitable movie could be found or an error occurred.
+    """
     user = request.user # Get user from request
     session_key = f'recommendation_cache_{user.id}' # Unique session key per user
     logger.debug(f"--- Finding next movie for user {user.id} (Session Cache Method) ---")
-
-    # uhhh I also did stuff to tmdb_service for session stuff, that may break a thing or two
 
     # cache first
     cached_ids = request.session.get(session_key, [])
@@ -57,7 +84,7 @@ def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass 
         try:
             movie_data = tmdb_service.get_movie_details(movie_id)
             if movie_data:
-                # Ensure it's saved locally (gets genres etc.)
+                # Ensure it's saved locally (important for watchlist, gets genres etc.)
                 movie_obj = tmdb_service.get_or_create_movie(movie_data)
                 if movie_obj:
                     logger.info(f"Serving movie '{movie_obj.title}' (ID: {movie_id}) from cache.")
@@ -183,10 +210,11 @@ def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass 
                      return movie_data
                 else: logger.warning(f"Failed get/create for newly cached ID {newly_cached_id}.")
             else: logger.warning(f"TMDB details None for newly cached ID {newly_cached_id}.")
-        except Exception as e: logger.exception(f"Unexpected error processing newly cached ID {newly_cached_id}")
-        # If serving first item failed, update session cache anyway before returning None
-        request.session[session_key] = valid_movie_ids
-        request.session.modified = True
+        except Exception as e: 
+            logger.exception(f"Unexpected error processing newly cached ID {newly_cached_id}")
+            request.session[session_key] = valid_movie_ids
+            request.session.modified = True
+            return None # expanded to indicate failure on full exception
 
     # Batch fetch yielded no valid movies OR serving first failed
     logger.warning(f"Failed to find or serve a suitable movie after batch fetch (Source: {cache_source_name}) for user {user.id}.")
@@ -198,31 +226,73 @@ def _get_next_movie_for_user(request, tmdb_service, apply_filters=True): # Pass 
     # reminder: I may want to add a popular fetch as a backup or prompt user with popular button, but that's js in index
 
 def home(request):
-    """Home page with movie recommendations"""
+    """
+    Renders the home page (index.html).
+
+    For authenticated users, it attempts to get next movie recommendation
+    using `_get_next_movie_for_user` and prepares filter form.
+    For anonymous users, it shows a welcome/login prompt.
+
+    Future todo: add non-login functionality
+
+    Args:
+        request (HttpRequest): The incoming HTTP request.
+
+    Returns:
+        HttpResponse: Rendered home page.
+    """
+    logger.debug(f"Home page request received. User authenticated: {request.user.is_authenticated}")
     current_movie_data = None
-    filter_form = FilterForm() # Initialize form
+    filter_form = None # Delay initialization of form
 
     if request.user.is_authenticated:
-        user_filters, _ = UserFilter.objects.get_or_create(user=request.user)
-        filter_form = FilterForm(instance=user_filters) # Populate form with user's filters
+        logger.debug(f"User '{request.user.username}' is authenticated. Getting filters and next movie.")
+        try:
+            user_filters, created = UserFilter.objects.get_or_create(user=request.user)
+            if created:
+                logger.info(f"Created UserFilter object for user {request.user.id}")
+            filter_form = FilterForm(instance=user_filters) # Populate form with user's filters
+        except Exception as e:
+            logger.exception(f"Error getting/creating UserFilter for user {request.user.id}. Filter form will be empty.")
+            filter_form = FilterForm() # Provide an empty form on error
 
-        # Uses helper function for next movie
+        # Uses helper function for next movie recommendation
         current_movie_data = _get_next_movie_for_user(request, tmdb_service)
+    else:
+        filter_form = FilterForm() # Empty form for anonymous users as well
 
     context = {
         'movie': current_movie_data, # Pass movie dict
         'filter_form': filter_form,
     }
-    
-    context = {
-        'movie': current_movie_data,
-        'filter_form': filter_form,
-    }
-    
+    logger.debug(f"Rendering home page with context: movie_present={bool(current_movie_data)}, filter_form_present={bool(filter_form)}")
     return render(request, 'flickFinder/index.html', context)
 
 def movie_detail(request, movie_id):
-    """Movie detail page"""
+    """
+    Renders the movie detail page (movie_detail.html).
+
+    Fetches detailed movie information from TMDB using the provided `movie_id`.
+    Ensures the movie exists in the local database (creating/updating if necessary).
+    Retrieves the latest user interaction with this movie if the user is logged in.
+
+    Args:
+        request (HttpRequest): The incoming HTTP request.
+        movie_id (int): The TMDB ID of the movie to display.
+
+    Returns:
+        HttpResponse: Rendered movie detail page.
+
+    Raises:
+        Http404: If the movie_id is invalid, movie details cannot be fetched from TMDB,
+                 or the movie cannot be saved/retrieved locally.
+    """
+    logger.debug(f"Request received for movie detail page. TMDB ID: {movie_id}")
+
+    if not isinstance(movie_id, int) or movie_id <= 0:
+        logger.warning(f"Invalid movie ID format received: {movie_id}")
+        raise Http404("Invalid movie ID provided.")
+    
     # Get movie details from TMDB
     try:
         movie_data = tmdb_service.get_movie_details(movie_id)
@@ -233,52 +303,82 @@ def movie_detail(request, movie_id):
         if not movie: # Handle case where movie couldn't be created/retrieved
             raise Http404("Movie could not be found or created in the database.")
     except TMDBServiceError:
+         logger.error(f"TMDB Service Error while fetching details for movie {movie_id}: {e}")
          raise Http404("Error communicating with the movie database.")
     except ValueError: # Catch potential errors if movie_id is invalid format
+         logger.warning(f"ValueError encountered processing movie ID: {movie_id}")
          raise Http404("Invalid movie ID format.")
+    except Exception as e:
+        logger.exception(f"Unexpected error retrieving movie details or object for TMDB ID {movie_id}: {e}")
+        raise Http404("An unexpected error occurred retrieving movie information.")
     
     # Get user interaction with this movie if logged in
     user_interaction = None
     if request.user.is_authenticated:
-        user_interaction = UserMovieInteraction.objects.filter(
-            user=request.user, movie=movie
-        ).order_by('-timestamp').first() # most recent
-    
+        try:
+            user_interaction = UserMovieInteraction.objects.filter(
+                user=request.user, movie=movie
+            ).order_by('-timestamp').first() # most recent
+            if not user_interaction:
+                logger.debug(f"No previous interaction found for user {request.user.id} and movie {movie_id}.")
+        except Exception as e:
+            logger.exception(f"Error retrieving interaction for user {request.user.id} and movie {movie_id}: {e}")
+
     context = {
-        'movie_data': movie_data,
-        'movie_obj': movie,
-        'user_interaction': user_interaction,
+        'movie_data': movie_data, # Raw data from TMDB
+        'movie_obj': movie, # Local movie model instance
+        'user_interaction': user_interaction, # Latest interaction object or None
     }
-    
     return render(request, 'flickFinder/movie_detail.html', context)
 
 @login_required
 @require_POST
 def movie_interaction(request):
-    """Handle user interaction with a movie (heart, block, watchlist, skip)"""
+    """
+    Handles AJAX POST requests for user interactions with movies (heart, block, etc.).
+
+    Validates input, retrieves/creates the movie locally, records the interaction,
+    and returns the next movie recommendation in the JSON response.
+
+    Args:
+        request (HttpRequest): The incoming AJAX POST request.
+            Expects 'movie_id' and 'interaction_type' in POST data.
+
+    Returns:
+        JsonResponse: Contains status ('success', 'error', 'no_more_movies')
+                      and occasionally 'next_movie' data or an error 'message'.
+    """
     movie_id_str = request.POST.get('movie_id')
     interaction_type = request.POST.get('interaction_type')
     
     # Validate interaction type
     if not movie_id_str or not movie_id_str.isdigit():
+        logger.warning(f"Invalid Movie ID received in interaction request: '{movie_id_str}' from User {request.user.id}")
         return JsonResponse({'status': 'error', 'message': 'Invalid Movie ID.'}, status=400)
     movie_id = int(movie_id_str)
 
     if interaction_type not in dict(UserMovieInteraction.INTERACTION_CHOICES):
+        logger.warning(f"Invalid interaction type received: '{interaction_type}' from User {request.user.id}")
         return JsonResponse({'status': 'error', 'message': 'Invalid interaction type'}, status=400)
     
     # Get movie from TMDB and store in db
     movie = Movie.objects.filter(tmdb_id=movie_id).first()
     if not movie:
+        logger.info(f"Movie with TMDB ID {movie_id} not found locally. Fetching details from TMDB.")
         try:
             movie_data = tmdb_service.get_movie_details(movie_id)
             if not movie_data:
-                 return JsonResponse({'status': 'error', 'message': 'Could not retrieve movie details.'}, status=503) # Service unavailable?
+                logger.error(f"Could not retrieve movie details from TMDB for ID {movie_id} during interaction.")
+                return JsonResponse({'status': 'error', 'message': 'Could not retrieve movie details.'}, status=503) # Service unavailable?
             movie = tmdb_service.get_or_create_movie(movie_data)
             if not movie:
-                 return JsonResponse({'status': 'error', 'message': 'Could not save movie locally.'}, status=500)
-        except TMDBServiceError:
-             return JsonResponse({'status': 'error', 'message': 'Error communicating with movie service.'}, status=503)
+                return JsonResponse({'status': 'error', 'message': 'Could not save movie locally.'}, status=500)
+        except TMDBServiceError as e:
+            logger.error(f"TMDB Service Error during interaction for movie {movie_id}: {e}")
+            return JsonResponse({'status': 'error', 'message': 'Error communicating with movie service.'}, status=503)
+        except Exception as e:
+            logger.exception(f"Unexpected error getting/creating movie {movie_id} during interaction: {e}")
+            return JsonResponse({'status': 'error', 'message': 'An unexpected error occurred processing the movie.'}, status=500)
     
     # Record the interaction
     interaction, created = UserMovieInteraction.objects.update_or_create(
@@ -299,6 +399,7 @@ def movie_interaction(request):
             'next_movie': next_movie_data # Send movie data dictionary
         })
     else:
+        logger.info(f"No more suitable movies found for User {request.user.id} after interaction.")
         return JsonResponse({
             'status': 'no_more_movies',
             'message': 'No more movies match your criteria. Try adjusting filters!'
@@ -307,79 +408,193 @@ def movie_interaction(request):
 @login_required
 @require_POST
 def save_filters(request):
-    """Save user filters"""
-    user_filters, _ = UserFilter.objects.get_or_create(user=request.user)
-    
-    form = FilterForm(request.POST, instance=user_filters)
-    if form.is_valid():
-        form.save()
-        session_key = f'recommendation_cache_{request.user.id}'
-        if session_key in request.session:
-            del request.session[session_key]
-            logger.info(f"Cleared recommendation cache for user {request.user.id} due to filter change.")
-        logger.info(f"Saved filters for user {request.user.id}: {form.cleaned_data}")
-        new_first_movie = _get_next_movie_for_user(request, tmdb_service)
-        return JsonResponse({
-            'status': 'success',
-            'next_movie': new_first_movie # Send next movie based on new filters
-        })
-    else:
-        logger.warning(f"Filter form invalid for user {request.user.id}: {form.errors.as_json()}")
-        return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+    """
+    Handles AJAX POST requests to save or update user's movie filters.
+
+    Validates the submitted filter form data. If valid, saves the filters,
+    clears the user's recommendation cache, and returns the first movie
+    matching the new filters.
+
+    Args:
+        request (HttpRequest): The incoming AJAX POST request containing filter form data.
+
+    Returns:
+        JsonResponse: Contains status ('success', 'error') and occasionally
+                      'next_movie' data or form 'errors'.
+    """
+    logger.debug(f"Save filters request received for User {request.user.id}.")
+
+
+    try:
+        user_filters, created = UserFilter.objects.get_or_create(user=request.user)
+        if created:
+            logger.info(f"Created new UserFilter object for User {request.user.id} during save.")
+
+        # Initialize the form with POST data and the user's filter instance
+        form = FilterForm(request.POST, instance=user_filters)
+
+        if form.is_valid():
+            logger.debug(f"Filter form is valid for User {request.user.id}. Saving filters...")
+            form.save()
+            session_key = f'recommendation_cache_{request.user.id}'
+            if session_key in request.session:
+                try:
+                    del request.session[session_key]
+                    # Also remove the source key
+                    cache_source_key = f'{session_key}_source'
+                    if cache_source_key in request.session:
+                         del request.session[cache_source_key]
+                    request.session.modified = True
+                    logger.info(f"Cleared recommendation cache for user {request.user.id} due to filter change.")
+                except KeyError:
+                     logger.warning(f"Tried to delete session key '{session_key}' but wasn't found for user {request.user.id}.")
+                except Exception as e:
+                    logger.exception(f"Error clearing session cache for user {request.user.id}: {e}")
+
+            logger.info(f"Saved filters for user {request.user.id}: {form.cleaned_data}")
+            new_first_movie = _get_next_movie_for_user(request, tmdb_service)
+            if new_first_movie:
+                 logger.debug(f"Returning new first movie '{new_first_movie.get('title')}' after filter save for user {request.user.id}")
+                 return JsonResponse({
+                     'status': 'success',
+                     'next_movie': new_first_movie # Send movie data dictionary
+                 })
+            else:
+                 logger.info(f"No movies found matching the new filters for user {request.user.id}.")
+                 return JsonResponse({
+                     'status': 'success', # Saving filters was successful, even if no movies match
+                     'next_movie': None, # Indicate no movie found
+                     'message': 'Filters saved, but no movies match your new criteria.'
+                 })
+        else:
+            logger.warning(f"Filter form invalid for user {request.user.id}: {form.errors.as_json()}")
+            return JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+    except Exception as e:
+        logger.exception(f"Unexpected error saving filters for user {request.user.id}: {e}")
+        return JsonResponse({'status': 'error', 'message': 'An unexpected error occurred while saving filters.'}, status=500)
 
 def signup(request):
-    """User signup view"""
+    """
+    Handles user registration (signup).
+
+    Displays the signup form on GET request.
+    Processes the form on POST, creates the user if valid, logs them in,
+    and redirects to the home page.
+
+    Args:
+        request (HttpRequest): The incoming HTTP request.
+
+    Returns:
+        HttpResponse: Rendered signup/login page or redirect to home.
+    """
     if request.method == 'POST':
+        logger.debug("Signup POST request received.")
         form = SignUpForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            # Log in the user
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password1')
-            user = authenticate(username=username, password=password)
-            login(request, user)
-            logger.info(f"New user signed up and logged in: {user.username}")
-            return redirect('home')
+            try:
+                user = form.save()
+                # Log in the user
+                username = form.cleaned_data.get('username')
+                password = form.cleaned_data.get('password1')
+                user = authenticate(username=username, password=password)
+                login(request, user)
+                logger.info(f"New user signed up and logged in: {user.username}")
+                return redirect('home')
+            except Exception as e:
+                 logger.exception(f"Error during user creation or login after signup: {e}")
+                 pass # pass through for now, need to work on this
+        else:
+            # Form is invalid, log errors and re-render the page
+            logger.warning(f"Signup form invalid. Errors: {form.errors.as_json()}")
     else:
         form = SignUpForm()
+
     return render(request, 'flickFinder/login.html', {'form': form, 'signup': True})
 
 def user_login(request):
-    """User login view"""
+    """
+    Handles user login.
+
+    Displays the login form on GET request.
+    Processes login credentials on POST, authenticates the user, logs them in,
+    and redirects to the intended destination or home page.
+
+    Args:
+        request (HttpRequest): The incoming HTTP request.
+
+    Returns:
+        HttpResponse: Rendered login page or redirect.
+    """
     if request.method == 'POST':
+        logger.debug("Login POST request received.")
         username = request.POST.get('username')
         password = request.POST.get('password')
+
+        if not username or not password:
+            logger.warning("Login attempt with missing username or password.")
+            # need to add error message to be displayed directly on login render
+            return render(request, 'flickFinder/login.html', {'error': 'Please provide both username and password.', 'signup': False})
+
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
-            login(request, user)
-            logger.info(f"User logged in: {username}")
-            next_url = request.POST.get('next', request.GET.get('next', ''))
-            return redirect(next_url or 'home')
+            try:
+                login(request, user)
+                logger.info(f"User logged in: {username}")
+                next_url = request.POST.get('next', request.GET.get('next', ''))
+                return redirect(next_url or 'home')
+            except Exception as e:
+                logger.exception(f"Error during login process for user '{username}': {e}")
+                return render(request, 'flickFinder/login.html', {'error': 'Invalid username or password.', 'signup': False})
         else:
             logger.warning(f"Login failed for username: {username}")
-            pass
-    return render(request, 'flickFinder/login.html', {'signup': False})
+            return render(request, 'flickFinder/login.html', {'error': 'Invalid username or password.', 'signup': False})
+    else:
+        # else for GET request to display login form
+        logger.debug("Login GET request received, displaying form.")
+        next_url = request.GET.get('next', '') # for redirection after login form
+        context = {'signup': False, 'next': next_url}
+        return render(request, 'flickFinder/login.html', context) # edited to follow similar format
 
 @login_required
 def watchlist(request):
-    """View user's watchlist"""
+    """
+    Renders the user's watchlist page (watchlist.html).
+
+    Retrieves movies the user has added to their watchlist.
+    Calculates user statistics (interaction counts).
+    Calculates basic genre preferences based on hearted/watchlisted movies.
+    Retrieves user's saved filters.
+
+    Args:
+        request (HttpRequest): The incoming HTTP request.
+
+    Returns:
+        HttpResponse: Rendered watchlist page.
+    """
+    logger.debug(f"Watchlist page request received for User {request.user.id}")
+
     watchlist_items = UserMovieInteraction.objects.filter(
         user=request.user,
         interaction_type='watchlist'
     ).select_related('movie').order_by('-timestamp')
     
     # Get user interaction statistics
+    user_stats = {} # initialize empty dict
     stats_queryset = UserMovieInteraction.objects.filter(user=request.user)
-    user_stats = stats_queryset.aggregate(
-        watchlist_count=Count('id', filter=Q(interaction_type='watchlist')),
-        heart_count=Count('id', filter=Q(interaction_type='heart')),
-        skip_count=Count('id', filter=Q(interaction_type='skip')),
-        block_count=Count('id', filter=Q(interaction_type='block')),
-        total_interactions=Count('id')
-    )
-    user_stats['join_date'] = request.user.date_joined
-    user_stats['last_login'] = request.user.last_login
+    try:
+        user_stats = stats_queryset.aggregate(
+            watchlist_count=Count('id', filter=Q(interaction_type='watchlist')),
+            heart_count=Count('id', filter=Q(interaction_type='heart')),
+            skip_count=Count('id', filter=Q(interaction_type='skip')),
+            block_count=Count('id', filter=Q(interaction_type='block')),
+            total_interactions=Count('id')
+        )
+        user_stats['join_date'] = request.user.date_joined
+        user_stats['last_login'] = request.user.last_login
+        logger.debug(f"Calculated user stats for User {request.user.id}: {user_stats}")
+    except Exception as e:
+        logger.exception(f"Error calculating statistics for User {request.user.id}: {e}")
 
     
     # Get genre preferences based on hearted and watchlisted movies
@@ -393,7 +608,7 @@ def watchlist(request):
         movies_with_genres = Movie.objects.filter(
             id__in=positive_interaction_movie_ids,
             genres__isnull=False # Only consider movies where genres are saved
-        )
+        ).exclude(genres__exact=[])
 
         genre_counter = Counter()
         for movie in movies_with_genres:
@@ -407,7 +622,7 @@ def watchlist(request):
 
         # Format for template (list of dictionaries)
         genre_preferences = [{'name': name, 'count': count} for name, count in top_genres]
-        logger.debug(f"Calculated genre preferences for user {request.user.id}: {genre_preferences}")
+        logger.info(f"Calculated genre preferences for user {request.user.id}: {genre_preferences}")
     except Exception as e:
         logger.error(f"Error calculating genre preferences for user {request.user.id}: {e}", exc_info=True)
 
@@ -420,36 +635,59 @@ def watchlist(request):
         'watchlist': watchlist_items,
         'user_stats': user_stats,
         'genre_preferences': genre_preferences,
-        'user_filters': user_filters,
-        'filter_form': filter_form,
+        'user_filters': user_filters, # model instance
+        'filter_form': filter_form, # form instance for rendering
     }
-    
     return render(request, 'flickFinder/watchlist.html', context)
 
 @login_required
 @require_POST
 def unwatchlist(request):
+    """
+    Handles AJAX POST request to remove a movie from the user's watchlist.
+
+    Instead of deleting the interaction, it changes the interaction_type
+    from 'watchlist' to 'skip' to maintain interaction history but effectively
+    remove it from the displayed watchlist.
+
+    Maybe this can be expanded for the unfunctional movie details page atm
+
+    Args:
+        request (HttpRequest): The incoming AJAX POST request.
+            Expects 'movie_id' in POST data.
+
+    Returns:
+        JsonResponse: Contains status ('success', 'error', 'not_found') and a 'message'.
+    """
     movie_id_str = request.POST.get('movie_id')
     if not movie_id_str or not movie_id_str.isdigit():
         return JsonResponse({'status': 'error', 'message': 'Invalid Movie ID.'}, status=400)
     movie_id = int(movie_id_str)
 
-    movie = get_object_or_404(Movie, tmdb_id=movie_id) # Ensure movie exists
+    try:
+        movie = get_object_or_404(Movie, tmdb_id=movie_id) # Ensure movie exists
 
-    temp = UserMovieInteraction.objects.get(
-        user=request.user,
-        movie=movie,
-        interaction_type='watchlist'
-    )
+        interaction = UserMovieInteraction.objects.get(
+            user=request.user,
+            movie=movie,
+            interaction_type='watchlist'
+        )
 
-    # Set interaction type to skip and save
-    temp.interaction_type = 'skip'
-    temp.save()
+        # Set interaction type to skip and save
+        interaction.interaction_type = 'skip' # Change type
+        interaction.timestamp = timezone.now() # Update timestamp
+        interaction.save()
 
-    if temp:
-        logger.info(f"Removed movie {movie_id} from watchlist for user {request.user.id}")
-        return JsonResponse({'status': 'success', 'message': 'Removed from watchlist'})
-    else:
-        logger.warning(f"Attempted to remove movie {movie_id} from watchlist for user {request.user.id}, but it wasn't found.")
-        # It's okay if it wasn't found, still return success for UI consistency
-        return JsonResponse({'status': 'success', 'message': 'Movie not found on watchlist, considered removed.'})
+        logger.info(f"Changed interaction type from 'watchlist' to 'skip' for movie {movie_id} ('{movie.title}') for user {request.user.id}")
+        return JsonResponse({'status': 'success', 'message': 'Removed from watchlist successfully.'})
+    except Movie.DoesNotExist:
+        logger.error(f"Attempted to unwatchlist movie with TMDB ID {movie_id}, but Movie object does not exist locally. User: {request.user.id}")
+        return JsonResponse({'status': 'error', 'message': 'Movie not found in database.'}, status=404)
+    except UserMovieInteraction.DoesNotExist:
+        # Was not found on user watchlist
+        logger.warning(f"Attempted to remove movie {movie_id} from watchlist for user {request.user.id}, but no 'watchlist' interaction was found.")
+        # Return success for UI consistency, as the item is effectively not on the watchlist, so ig it works
+        return JsonResponse({'status': 'success', 'message': 'Movie was not on your watchlist.'})
+    except Exception as e:
+        logger.exception(f"Error during unwatchlist process for movie {movie_id}, user {request.user.id}: {e}")
+        return JsonResponse({'status': 'error', 'message': 'An unexpected error occurred.'}, status=500)
