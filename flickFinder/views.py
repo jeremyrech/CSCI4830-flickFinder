@@ -3,14 +3,15 @@ from django.contrib.auth import login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST
-from .forms import SignUpForm, FilterForm
-from .models import UserMovieInteraction, UserFilter, Movie
-from .services.tmdb_service import TMDBService, TMDBServiceError
 from django.utils import timezone
 from django.db.models import Count, Q
 import logging
-from collections import Counter
 import random
+from collections import Counter
+
+from .forms import SignUpForm, FilterForm
+from .models import UserMovieInteraction, UserFilter, Movie
+from .services.tmdb_service import TMDBService, TMDBServiceError
 
 logger = logging.getLogger(__name__)
 BATCH_FETCH_PAGES = 5
