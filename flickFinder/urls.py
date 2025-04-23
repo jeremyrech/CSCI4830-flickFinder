@@ -27,4 +27,6 @@ urlpatterns = [
     path('watchlist/', views.watchlist, name='watchlist'),
 
     # logout included in django auth
+
+    path('search/', views.search_movies, name='search_movies'),
 ]

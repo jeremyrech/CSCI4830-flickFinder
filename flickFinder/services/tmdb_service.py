@@ -181,3 +181,21 @@ class TMDBService:
             return data.get('genres', []) if data else []
         except TMDBServiceError as e:
             return []
+        
+    def search_movies(self, query):
+        """Search for movies in TMDB database"""
+        params = {
+            'query': query,
+            'include_adult': 'false'
+        }
+        
+        try:
+            data = self._make_request("search/movie", params)
+            if data:
+                return data.get('results', [])
+            else:
+                return []
+        except TMDBServiceError as e:
+            # Already logged in _make_request
+            logger.error(f"TMDB search failed for query '{query}': {str(e)}")
+            return []

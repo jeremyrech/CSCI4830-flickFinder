@@ -5,6 +5,7 @@ from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.db.models import Count, Q
+from django.contrib import messages
 import logging
 import random
 from collections import Counter
@@ -691,3 +692,41 @@ def unwatchlist(request):
     except Exception as e:
         logger.exception(f"Error during unwatchlist process for movie {movie_id}, user {request.user.id}: {e}")
         return JsonResponse({'status': 'error', 'message': 'An unexpected error occurred.'}, status=500)
+    
+def search_movies(request):
+    query = request.GET.get('query', '').strip()
+    
+    if not query:
+        messages.warning(request, "Please enter a search term")
+        return redirect('home')
+    
+    try:
+        tmdb_service = TMDBService()
+        search_results = tmdb_service.search_movies(query)
+        
+        if not search_results:
+            messages.info(request, f"No movies found for '{query}'")
+            return redirect('home')
+            
+        # If we find exact match by title, go directly to detail page
+        exact_match = next(
+            (movie for movie in search_results 
+             if movie['title'].lower() == query.lower()), 
+            None
+        )
+        
+        if exact_match:
+            return redirect('movie_detail', movie_id=exact_match['id'])
+        
+        # Otherwise show search results page
+        context = {
+            'query': query,
+            'results': search_results,
+            'result_count': len(search_results)
+        }
+        return render(request, 'flickFinder/search_results.html', context)
+        
+    except Exception as e:
+        logger.error(f"Search error for query '{query}': {str(e)}")
+        messages.error(request, "An error occurred during search")
+        return redirect('home')

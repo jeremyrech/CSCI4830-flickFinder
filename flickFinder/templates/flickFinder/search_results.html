@@ -1,0 +1,30 @@
+{% extends 'flickFinder/base.html' %}
+{% load static %}
+
+{% block title %}Search Results for "{{ query }}"{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Search Results for "{{ query }}"</h2>
+    <p class="text-muted">{{ result_count }} results found</p>
+    
+    <div class="row mt-4">
+        {% for movie in results %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <a href="{% url 'movie_detail' movie.id %}">
+                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
+                         class="card-img-top" alt="{{ movie.title }}">
+                </a>
+                <div class="card-body">
+                    <h5 class="card-title">{{ movie.title }}</h5>
+                    <p class="card-text">
+                        {{ movie.release_date|slice:"0:4" }} | {{ movie.vote_average|floatformat:1 }}/10
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
