@@ -1,0 +1,56 @@
+/* Login / Register Page */
+
+/*input container display*/
+.auth-container {
+    max-width: 450px;
+    margin: 50px auto;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    background-color: #fff;
+}
+
+/*container header*/
+.auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+/*login/sign up tabs*/
+.tab-buttons {
+    display: flex;
+    margin-bottom: 20px;
+}
+.tab-btn { 
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 2px solid #f1f1f1;
+}
+.tab-btn.active {/*emphasizes the tab youre on*/
+    border-bottom: 2px solid #007bff;
+    font-weight: bold;
+}
+
+/*only show one tab at a time*/
+.form-section {
+    display: none;
+}
+
+/*dispaly the active tab*/
+.form-section.active {
+    display: block;
+}
+
+/*provides margin for the tabs*/
+.form-floating {
+    margin-bottom: 15px;
+}
+
+/*login/signup button display*/
+.btn-auth {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+}

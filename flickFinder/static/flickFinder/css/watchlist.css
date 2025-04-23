@@ -1,0 +1,216 @@
+/* watchlist / profile page*/
+
+/*unsure if this is needed*/
+/* .section-header {
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 0.5rem;
+    } */
+
+/*generic on hover for cards*/
+.card:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(-3px);
+}
+
+/* Profile section styles */
+.profile-header {
+    /*specifcally user backdrop*/
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 10px;
+}
+.profile-stats {
+    /*specifically user stats*/
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+    margin-top: 1.5rem;
+}
+
+
+/*User Stats*/
+.stat-item {
+    /*i believe this is generic padding for the stats*/
+    padding: 0 1rem;
+}
+.stat-count {
+    /*changes font, size, weight of the stats*/
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+.stat-label {
+    /*label under the stat*/
+    font-size: .9rem;
+    opacity: 0.8;
+}
+
+/*profile picture display*/
+.profile-picture {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    color: #333;
+    font-size: 2rem;
+    border: 1px solid #dee2e6;
+}
+
+/*User Info*/
+.user-info {
+    /*generic align the user info*/
+    text-align: center;
+}
+.username {
+    /*username display under PFP*/
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+.user-meta {
+    /*display beneath username, show date joined*/
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/*genre badge display*/
+.genre-badge {
+    display: inline-block;
+    background-color: #f8f9fa;
+    color: #333;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-right: 3px;
+    margin-bottom: 5px;
+}
+
+
+/* Watchlist styles */
+.watchlist-header {
+    /*watchlist header container*/
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 0.5rem;
+
+}
+.watchlist-title {
+    margin-bottom: 0px;
+}
+.watchlist-tools {
+    display: flex;
+    align-items: center;
+}
+
+/*Movie Cards*/
+.movie-card {
+    /*actual card display*/
+    margin-bottom: 20px;
+    height: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.movie-poster {
+    /*movie heights*/
+    width: 100%;
+    height: 400px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+    display: block;
+}
+.movie-card:hover .movie-poster {
+    transform: scale(1.05);
+}
+
+/*might not be needed*/
+/* .movie-info { 
+    padding: 15px;
+} */
+.movie-title {
+    /*Title text on cards*/
+    font-weight: 600;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/*buttons*/
+.action-buttons {
+    /*only used for remove button, changing these values didnt do anything though*/
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+}
+
+/* Filter and search */
+.filter-section {
+    /*container for search and filter*/
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+}
+.search-box {
+    /*search bar display*/
+    margin-right: 10px;
+}
+.sort-by {
+    /*sort display*/
+    min-width: 150px;
+}
+
+
+/* Animation for remove/watch buttons */
+/* probably want to change */
+.btn-animated {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+.btn-animated:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+.btn-animated:hover:after {
+    animation: ripple 1s ease-out;
+}
+
+@keyframes ripple {
+    0% {
+        transform: scale(0, 0);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: scale(20, 20);
+        opacity: 0;
+    }
+}
+
+/*display once watchlist is emptied*/
+.empty-watchlist {
+    text-align: center;
+    padding: 50px 0;
+    background: #f9f9f9;
+    border-radius: 10px;
+}

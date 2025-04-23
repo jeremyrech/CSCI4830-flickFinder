@@ -1,61 +1,12 @@
 {% extends 'flickFinder/base.html' %}
+{%load static%}
 
 {% block title %}
     {% if signup %}Sign Up{% else %}Login{% endif %} - FlickFinder
 {% endblock %}
 
 {% block extra_css %}
-<style>
-    .auth-container {
-        max-width: 450px;
-        margin: 50px auto;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        background-color: #fff;
-    }
-    
-    .auth-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .tab-buttons {
-        display: flex;
-        margin-bottom: 20px;
-    }
-    
-    .tab-btn {
-        flex: 1;
-        text-align: center;
-        padding: 10px;
-        cursor: pointer;
-        border-bottom: 2px solid #f1f1f1;
-    }
-    
-    .tab-btn.active {
-        border-bottom: 2px solid #007bff;
-        font-weight: bold;
-    }
-    
-    .form-section {
-        display: none;
-    }
-    
-    .form-section.active {
-        display: block;
-    }
-    
-    .form-floating {
-        margin-bottom: 15px;
-    }
-    
-    .btn-auth {
-        width: 100%;
-        padding: 12px;
-        margin-top: 10px;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'flickFinder/css/login.css' %}">
 {% endblock %}
 
 {% block content %}
