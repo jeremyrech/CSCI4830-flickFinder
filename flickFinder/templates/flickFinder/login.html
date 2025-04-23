@@ -23,15 +23,18 @@
     
     <!-- Login Form -->
     <div class="form-section {% if not signup %}active{% endif %}" id="loginForm">
-        <form method="post" action="{% url 'login' %}">
+        <form method="post" action="{% url 'login' %}" id="authForm">
             {% csrf_token %}
-            <div class="form-floating mb-3">
+            <div class="form-floating mb-3 position-relative">
                 <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
                 <label for="username">Username</label>
             </div>
-            <div class="form-floating mb-3">
+            <div class="form-floating mb-3 position-relative">
                 <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
                 <label for="password">Password</label>
+                <button type="button" class="btn btn-sm position-absolute top-50 end-0 translate-middle-y toggle-pass">
+                    <i class="fa fa-eye"></i>
+                </button>
             </div>
             <button type="submit" class="btn btn-primary btn-auth">Login</button>
         </form>
@@ -39,7 +42,7 @@
     
     <!-- Signup Form -->
     <div class="form-section {% if signup %}active{% endif %}" id="signupForm">
-        <form method="post" action="{% url 'signup' %}">
+        <form method="post" action="{% url 'signup' %}" id="authForm">
             {% csrf_token %}
             
             {% if form.errors %}
@@ -81,4 +84,11 @@
 
 {% block extra_js %}
 <script src="{% static 'flickFinder/js/login.js' %}"></script>
+<script>
+      $(document).on('click','.toggle-pass',function(){
+      const $inp=$(this).closest('.position-relative').find('input');
+      $inp.attr('type',$inp.attr('type')==='password'?'text':'password');
+      $(this).find('i').toggleClass('fa-eye fa-eye-slash');
+  });
+</script>
 {% endblock %}
