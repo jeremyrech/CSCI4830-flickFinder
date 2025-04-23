@@ -1,4 +1,5 @@
 {% extends 'flickFinder/base.html' %}
+{% load static %}
 
 {% block title %}{{ movie_data.title }} - FlickFinder{% endblock %}
 
@@ -231,38 +232,10 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    $(document).ready(function() {
-        // Handle movie interactions
-        // probably should move this to the main.js and import to share between this and index
-        $('.movie-actions button').click(function() {
-            const $button = $(this);
-            const movieId = $(this).data('movie-id');
-            const action = $(this).data('action');
-            const isUnAction = action.startsWith('un');
-            const interactionType = action.replace('un', '');
-
-            $button.prop('disabled', true).addClass('button-loading');
-            $button.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Working...');
-            
-            $.ajax({
-                url: '{% url "movie_interaction" %}',
-                type: 'POST',
-                data: {
-                    'movie_id': movieId,
-                    'interaction_type': interactionType,
-                    'csrfmiddlewaretoken': '{{ csrf_token }}'
-                },
-                success: function() {
-                    // Reload the page to refresh the UI
-                    location.reload();
-                },
-                error: function() {
-                    alert('An error occurred. Please try again.');
-                    $button.prop('disabled', false).removeClass('button-loading');
-                }
-            });
-        });
-    });
-</script>
+    <!-- expose the interaction URL to JS -->
+    <script>
+        window.flickFinderUrls = window.flickFinderUrls || {};
+        window.flickFinderUrls.movieInteraction = "{% url 'movie_interaction' %}";
+    </script>
+    <script src="{% static 'flickFinder/js/detail.js' %}"></script>
 {% endblock %}
