@@ -80,22 +80,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    $(document).ready(function() {
-        // Tab switching functionality
-        $('#loginTab').click(function() {
-            $('.tab-btn').removeClass('active');
-            $(this).addClass('active');
-            $('.form-section').removeClass('active');
-            $('#loginForm').addClass('active');
-        });
-        
-        $('#signupTab').click(function() {
-            $('.tab-btn').removeClass('active');
-            $(this).addClass('active');
-            $('.form-section').removeClass('active');
-            $('#signupForm').addClass('active');
-        });
-    });
-</script>
+<script src="{% static 'flickFinder/js/login.js' %}"></script>
 {% endblock %}
