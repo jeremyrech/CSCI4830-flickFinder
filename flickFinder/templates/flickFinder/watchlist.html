@@ -42,7 +42,7 @@
                         <div class="stat-label">Total Interactions</div>
                     </div>
                 </div>
-                
+
                 <div class="mt-4 text-center">
                     <h5>Favorite Genres</h5>
                     <div>
@@ -57,19 +57,27 @@
         </div>
     </div>
 </div>
+<div class="dropdown">
+    <button class="btn btn-secondary dropdown-toggle mb-3" type="button" id="dropdownSelection" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="flase">
+        Select List</button>
+    <ul class="dropdown-menu" aria-labelledby="dropdownSelection">
+        <li><a class="dropdown-item" href="#" data-target="WatchListContainer">Watchlist</a> </li>
+        <li><a class="dropdown-item" href="#" data-target="LikeListContainer">Liked Movies</a> </li>
+    </ul>
+</div>
 
 <!-- Watchlist Section -->
-<div class="container">
+<div class="container" id="WatchListContainer">
     <div class="watchlist-header">
         <h2 class="watchlist-title">My Watchlist</h2>
-        
+
         <div class="watchlist-tools">
             <a href="{% url 'home' %}" class="btn btn-primary">
                 <i class="fas fa-film me-1"></i> Discover More
             </a>
         </div>
     </div>
-    
+
     <!-- Filter and Search -->
     {% if watchlist %}
     <div class="filter-section">
@@ -96,20 +104,19 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Watchlist Movies -->
     <div class="row" id="watchlistGrid">
         {% for item in watchlist %}
-        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4 watchlist-item" 
-             data-title="{{ item.movie.title|lower }}" 
-             data-date="{{ item.timestamp|date:'YmdHis' }}"
-             data-genres="{% for genre in item.movie.genres %}{{ genre.id }},{% endfor %}"
-             data-rating="{{ item.movie.vote_average|default:0 }}">
+        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4 watchlist-item" data-title="{{ item.movie.title|lower }}"
+            data-date="{{ item.timestamp|date:'YmdHis' }}"
+            data-genres="{% for genre in item.movie.genres %}{{ genre.id }},{% endfor %}"
+            data-rating="{{ item.movie.vote_average|default:0 }}">
             <div class="card movie-card h-100">
                 <div class="poster-container position-relative">
                     <a href="{% url 'movie_detail' item.movie.tmdb_id %}">
-                        <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}" 
-                             alt="{{ item.movie.title }}" class="movie-poster">
+                        <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}"
+                            alt="{{ item.movie.title }}" class="movie-poster">
                     </a>
                     {% if item.movie.vote_average %}
                     <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2">
@@ -122,16 +129,16 @@
                     <div class="text-muted small mb-2">Added {{ item.timestamp|date:"M d, Y" }}</div>
                     <div class="mb-2">
                         {% for genre in item.movie.genres|slice:":3" %} {# Show first 3 genres #}
-                           <span class="badge genre-badge small">{{ genre.name }}</span>
+                        <span class="badge genre-badge small">{{ genre.name }}</span>
                         {% endfor %}
                     </div>
                     <div class="action-buttons mt-auto d-flex justify-content-between">
-                        <button class="btn btn-sm btn-outline-danger btn-animated remove-btn" 
-                                data-movie-id="{{ item.movie.tmdb_id }}">
+                        <button class="btn btn-sm btn-outline-danger btn-animated remove-btn"
+                            data-movie-id="{{ item.movie.tmdb_id }}">
                             <i class="fas fa-trash-alt"></i> Remove
                         </button>
-                        <a href="{% url 'movie_detail' item.movie.tmdb_id %}" 
-                           class="btn btn-sm btn-outline-primary btn-animated">
+                        <a href="{% url 'movie_detail' item.movie.tmdb_id %}"
+                            class="btn btn-sm btn-outline-primary btn-animated">
                             <i class="fas fa-info-circle"></i> Details
                         </a>
                     </div>
@@ -140,7 +147,8 @@
         </div>
         {% endfor %}
     </div>
-    
+
+
     <!-- No Results Message (Hidden by default) -->
     <div id="noResults" class="empty-watchlist" style="display: none;">
         <h3>No matching movies</h3>
@@ -156,21 +164,125 @@
     </div>
     {% endif %}
 </div>
+
+
+
+<!--Like List Section-->
+<div class="container d-none" id="LikeListContainer">
+    <!--Header-->
+    <div class="watchlist-header">
+        <h2 class="watchlist-title">Liked Movies</h2>
+
+        <div class="watchlist-tools">
+            <a href="{% url 'home' %}" class="btn btn-primary">
+                <i class="fas fa-film me-1"></i> Discover More
+            </a>
+        </div>
+    </div>
+
+    <!--Filter-->
+    {%if likelist %}
+    <div class="filter-section">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="input-group search-box">
+                    <input type="text" id="searchLikeList" class="form-control" placeholder="Search your liked movies...">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 d-flex justify-content-end">
+                <select id="sortLikeList" class="form-select sort-by"> <!-- my funny little icons don't work :( -->
+                    <option value="date-desc"><i class="fas fa-calendar-alt me-1"></i> Newest First</option>
+                    <option value="date-asc"><i class="fas fa-calendar-alt me-1"></i> Oldest First</option>
+                    <option value="title-asc"><i class="fas fa-sort-alpha-down me-1"></i> Title A-Z</option>
+                    <option value="title-desc"><i class="fas fa-sort-alpha-up me-1"></i> Title Z-A</option>
+                    <option value="rating-desc"><i class="fas fa-star me-1"></i> Rating Desc</option>
+                    <option value="rating-asc"><i class="fas fa-star me-1"></i> Rating Asc</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!--Actual Liked List-->
+    <div class="row" id="likelistGrid">
+        {% for item in likelist %}
+        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4 watchlist-item" data-title="{{ item.movie.title|lower }}"
+            data-date="{{ item.timestamp|date:'YmdHis' }}"
+            data-genres="{% for genre in item.movie.genres %}{{ genre.id }},{% endfor %}"
+            data-rating="{{ item.movie.vote_average|default:0 }}">
+            <div class="card movie-card h-100">
+                <div class="poster-container position-relative">
+                    <a href="{% url 'movie_detail' item.movie.tmdb_id %}">
+                        <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}"
+                            alt="{{ item.movie.title }}" class="movie-poster">
+                    </a>
+                    {% if item.movie.vote_average %}
+                    <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2">
+                        <i class="fas fa-star"></i> {{ item.movie.vote_average|floatformat:1 }}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title movie-title" title="{{ item.movie.title }}">{{ item.movie.title }}</h5>
+                    <div class="text-muted small mb-2">Added {{ item.timestamp|date:"M d, Y" }}</div>
+                    <div class="mb-2">
+                        {% for genre in item.movie.genres|slice:":3" %} {# Show first 3 genres #}
+                        <span class="badge genre-badge small">{{ genre.name }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="action-buttons mt-auto d-flex justify-content-between">
+                        <button class="btn btn-sm btn-outline-danger btn-animated remove-btn"
+                            data-movie-id="{{ item.movie.tmdb_id }}">
+                            <i class="fas fa-trash-alt"></i> Remove
+                        </button>
+                        <a href="{% url 'movie_detail' item.movie.tmdb_id %}"
+                            class="btn btn-sm btn-outline-primary btn-animated">
+                            <i class="fas fa-info-circle"></i> Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+
+    <!-- No Results Message (Hidden by default) -->
+    <div id="noResults" class="empty-watchlist" style="display: none;">
+        <h3>No matching movies</h3>
+        <p>Try adjusting your search criteria</p>
+    </div>
+    {% else %}
+    <div class="empty-watchlist">
+        <h3>Your Liked Movies list is empty</h3>
+        <p>Start exploring movies to add them to your Liked Movies</p>
+        <a href="{% url 'home' %}" class="btn btn-primary">
+            <i class="fas fa-film"></i> Discover Movies
+        </a>
+    </div>
+    {% endif %}
+    
+
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    $(document).ready(function() {
+    $(document).ready(function () {
         // Handle remove from watchlist
-        $('.remove-btn').click(function() {
+        $('.remove-btn').click(function () {
             const $card = $(this).closest('.watchlist-item');
             const movieId = $(this).data('movie-id');
-            
+
             // Animate the card removal
             $card.css('transition', 'all 0.3s ease');
             $card.css('opacity', '0');
             $card.css('transform', 'scale(0.8)');
-            
+
             // Send the AJAX request to remove from watchlist
             $.ajax({
                 url: '{% url "unwatchlist" %}',
@@ -179,10 +291,10 @@
                     'movie_id': movieId,
                     'csrfmiddlewaretoken': '{{ csrf_token }}'
                 },
-                success: function(response) {
+                success: function (response) {
                     // Complete removal after animation
                     if (response.status === 'success' || response.status === 'not_found') { // Treat not_found as success for UI removal
-                        setTimeout(function() {
+                        setTimeout(function () {
                             $card.remove();
                             if ($('.watchlist-item').length === 0 && $('#noResults:visible').length === 0) { // Check visible items excluding noResults div
                                 // Reload to show the main empty watchlist message if needed
@@ -198,22 +310,22 @@
                         alert(response.message || 'Failed to remove item. Please try again.');
                     }
                 },
-                error: function() {
+                error: function () {
                     // Restore the card on error
                     $card.css('opacity', '1').css('transform', 'none');
                     alert('An error occurred. Please try again.');
                 }
             });
         });
-        
+
         // Search functionality
-        $('#searchWatchlist').on('keyup', function() {
+        $('#searchWatchlist').on('keyup', function () {
             const searchTerm = $(this).val().toLowerCase();
             let matchFound = false;
-            
-            $('.watchlist-item').each(function() {
+
+            $('.watchlist-item').each(function () {
                 const title = $(this).data('title');
-                
+
                 if (title.includes(searchTerm)) {
                     $(this).show();
                     matchFound = true;
@@ -221,20 +333,20 @@
                     $(this).hide();
                 }
             });
-            
+
             // Show/hide no results message
             $('#noResults').toggle(!matchFound);
         });
-        
+
         // Sort functionality
-        $('#sortWatchlist').on('change', function() {
+        $('#sortWatchlist').on('change', function () {
             const sortValue = $(this).val();
             const $grid = $('#watchlistGrid');
             const $items = $('.watchlist-item');
-            
+
             // Sort the items
-            $items.sort(function(a, b) {
-                switch(sortValue) {
+            $items.sort(function (a, b) {
+                switch (sortValue) {
                     case 'date-desc':
                         return $(b).data('date') - $(a).data('date');
                     case 'date-asc':
@@ -243,7 +355,7 @@
                         return $(a).data('title').localeCompare($(b).data('title'));
                     case 'title-desc':
                         return $(b).data('title').localeCompare($(a).data('title'));
-                    case 'rating-desc': 
+                    case 'rating-desc':
                         return $(b).data('rating') - $(a).data('rating');
                     case 'rating-asc':
                         return $(a).data('rating') - $(b).data('rating');
@@ -251,21 +363,35 @@
                         return 0;
                 }
             });
-            
+
             // Reattach sorted items to grid
             $items.detach().appendTo($grid);
-            
+
             // Apply animations
-            $items.each(function(i) {
+            $items.each(function (i) {
                 const $item = $(this);
                 $item.css('opacity', '0');
-                
-                setTimeout(function() {
+
+                setTimeout(function () {
                     $item.css('transition', 'opacity 0.3s ease');
                     $item.css('opacity', '1');
                 }, i * 50); // Staggered animation
             });
         });
+
+        //Dropdown list selection
+        $('.dropdown-item').on("click", function (event){
+            event.preventDefault();
+            const targetId = $(this).data('target');
+            const label = $(this).text();
+
+            $('#WatchListContainer, #LikeListContainer').addClass('d-none');
+
+            $('#'+targetId).removeClass('d-none');
+
+        });
+
+        
     });
 </script>
 {% endblock %}

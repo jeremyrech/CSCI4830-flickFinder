@@ -578,6 +578,11 @@ def watchlist(request):
         user=request.user,
         interaction_type='watchlist'
     ).select_related('movie').order_by('-timestamp')
+
+    likelist_items = UserMovieInteraction.objects.filter(
+        user=request.user,
+        interaction_type='heart'
+    ).select_related('movie').order_by('-timestamp')
     
     # Get user interaction statistics
     user_stats = {} # initialize empty dict
@@ -637,6 +642,7 @@ def watchlist(request):
         'genre_preferences': genre_preferences,
         'user_filters': user_filters, # model instance
         'filter_form': filter_form, # form instance for rendering
+        'likelist' : likelist_items,
     }
     return render(request, 'flickFinder/watchlist.html', context)
 
@@ -667,16 +673,22 @@ def unwatchlist(request):
     try:
         movie = get_object_or_404(Movie, tmdb_id=movie_id) # Ensure movie exists
 
-        interaction = UserMovieInteraction.objects.get(
+        
+
+        interaction= UserMovieInteraction.objects.get(
+            Q(interaction_type='watchlist') | Q(interaction_type='heart'),
             user=request.user,
-            movie=movie,
-            interaction_type='watchlist'
+            movie=movie,    
         )
+
+
 
         # Set interaction type to skip and save
         interaction.interaction_type = 'skip' # Change type
         interaction.timestamp = timezone.now() # Update timestamp
         interaction.save()
+
+
 
         logger.info(f"Changed interaction type from 'watchlist' to 'skip' for movie {movie_id} ('{movie.title}') for user {request.user.id}")
         return JsonResponse({'status': 'success', 'message': 'Removed from watchlist successfully.'})
