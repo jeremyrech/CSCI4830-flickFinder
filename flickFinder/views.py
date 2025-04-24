@@ -579,6 +579,92 @@ def watchlist(request):
         interaction_type='watchlist'
     ).select_related('movie').order_by('-timestamp')
 
+    
+    # Get user interaction statistics
+    user_stats = {} # initialize empty dict
+    stats_queryset = UserMovieInteraction.objects.filter(user=request.user)
+    try:
+        user_stats = stats_queryset.aggregate(
+            watchlist_count=Count('id', filter=Q(interaction_type='watchlist')),
+            heart_count=Count('id', filter=Q(interaction_type='heart')),
+            skip_count=Count('id', filter=Q(interaction_type='skip')),
+            block_count=Count('id', filter=Q(interaction_type='block')),
+            total_interactions=Count('id')
+        )
+        user_stats['join_date'] = request.user.date_joined
+        user_stats['last_login'] = request.user.last_login
+        logger.debug(f"Calculated user stats for User {request.user.id}: {user_stats}")
+    except Exception as e:
+        logger.exception(f"Error calculating statistics for User {request.user.id}: {e}")
+
+    
+    # Get genre preferences based on hearted and watchlisted movies
+    genre_preferences = []
+    try:
+        positive_interaction_movie_ids = UserMovieInteraction.objects.filter(
+            user=request.user,
+            interaction_type__in=['heart', 'watchlist']
+        ).values_list('movie_id', flat=True).distinct() # Get unique movies
+    
+        movies_with_genres = Movie.objects.filter(
+            id__in=positive_interaction_movie_ids,
+            genres__isnull=False # Only consider movies where genres are saved
+        ).exclude(genres__exact=[])
+
+        genre_counter = Counter()
+        for movie in movies_with_genres:
+            # Assumes movie.genres stores a list like [{'id': 28, 'name': 'Action'}, ...]
+            if isinstance(movie.genres, list):
+                 for genre in movie.genres:
+                     if isinstance(genre, dict) and 'name' in genre:
+                         genre_counter[genre['name']] += 1
+        # Get 5 most common genres, list of tuples
+        top_genres = genre_counter.most_common(5)
+
+        # Format for template (list of dictionaries)
+        genre_preferences = [{'name': name, 'count': count} for name, count in top_genres]
+        logger.info(f"Calculated genre preferences for user {request.user.id}: {genre_preferences}")
+    except Exception as e:
+        logger.error(f"Error calculating genre preferences for user {request.user.id}: {e}", exc_info=True)
+
+    # Get filters
+    user_filters, _ = UserFilter.objects.get_or_create(user=request.user)
+    # Pass the form for potential display/editing on watchlist page?
+    filter_form = FilterForm(instance=user_filters)
+
+    context = {
+        'watchlist': watchlist_items,
+        'user_stats': user_stats,
+        'genre_preferences': genre_preferences,
+        'user_filters': user_filters, # model instance
+        'filter_form': filter_form, # form instance for rendering
+        
+    }
+    return render(request, 'flickFinder/watchlist.html', context)
+
+@login_required
+def likelist(request):
+    """
+    Renders the user's watchlist page (watchlist.html).
+
+    Retrieves movies the user has added to their watchlist.
+    Calculates user statistics (interaction counts).
+    Calculates basic genre preferences based on hearted/watchlisted movies.
+    Retrieves user's saved filters.
+
+    Args:
+        request (HttpRequest): The incoming HTTP request.
+
+    Returns:
+        HttpResponse: Rendered watchlist page.
+    """
+    logger.debug(f"Watchlist page request received for User {request.user.id}")
+
+    watchlist_items = UserMovieInteraction.objects.filter(
+        user=request.user,
+        interaction_type='watchlist'
+    ).select_related('movie').order_by('-timestamp')
+
     likelist_items = UserMovieInteraction.objects.filter(
         user=request.user,
         interaction_type='heart'
@@ -644,7 +730,8 @@ def watchlist(request):
         'filter_form': filter_form, # form instance for rendering
         'likelist' : likelist_items,
     }
-    return render(request, 'flickFinder/watchlist.html', context)
+    return render(request, 'flickFinder/likelist.html', context)
+
 
 @login_required
 @require_POST
@@ -675,18 +762,19 @@ def unwatchlist(request):
 
         
 
-        interaction= UserMovieInteraction.objects.get(
+        interactionOBJ = UserMovieInteraction.objects.filter(
             Q(interaction_type='watchlist') | Q(interaction_type='heart'),
             user=request.user,
             movie=movie,    
         )
 
-
+        for interact in interactionOBJ:
+            interact.delete()
 
         # Set interaction type to skip and save
-        interaction.interaction_type = 'skip' # Change type
-        interaction.timestamp = timezone.now() # Update timestamp
-        interaction.save()
+        # interaction.interaction_type = 'skip' # Change type
+        # interaction.timestamp = timezone.now() # Update timestamp
+        # interaction.save()
 
 
 

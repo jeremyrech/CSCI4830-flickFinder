@@ -1,7 +1,7 @@
 {% extends 'flickFinder/base.html' %}
 {% load static %}
 
-{% block title %}My Watchlist - FlickFinder{% endblock %}
+{% block title %}My Liked Movies - FlickFinder{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'flickFinder/css/watchlist.css' %}">
@@ -66,10 +66,13 @@
     </ul>
 </div>
 
-<!-- Watchlist Section -->
-<div class="container" id="WatchListContainer">
+
+
+<!--Like List Section-->
+<div class="container" id="LikeListContainer">
+    <!--Header-->
     <div class="watchlist-header">
-        <h2 class="watchlist-title">My Watchlist</h2>
+        <h2 class="watchlist-title">Liked Movies</h2>
 
         <div class="watchlist-tools">
             <a href="{% url 'home' %}" class="btn btn-primary">
@@ -78,13 +81,13 @@
         </div>
     </div>
 
-    <!-- Filter and Search -->
-    {% if watchlist %}
+    <!--Filter-->
+    {%if likelist %}
     <div class="filter-section">
         <div class="row">
             <div class="col-md-6">
                 <div class="input-group search-box">
-                    <input type="text" id="searchWatchlist" class="form-control" placeholder="Search your watchlist...">
+                    <input type="text" id="searchLikeList" class="form-control" placeholder="Search your liked movies...">
                     <div class="input-group-append">
                         <button class="btn btn-outline-secondary" type="button">
                             <i class="fas fa-search"></i>
@@ -93,7 +96,7 @@
                 </div>
             </div>
             <div class="col-md-6 d-flex justify-content-end">
-                <select id="sortWatchlist" class="form-select sort-by"> <!-- my funny little icons don't work :( -->
+                <select id="sortLikeList" class="form-select sort-by"> <!-- my funny little icons don't work :( -->
                     <option value="date-desc"><i class="fas fa-calendar-alt me-1"></i> Newest First</option>
                     <option value="date-asc"><i class="fas fa-calendar-alt me-1"></i> Oldest First</option>
                     <option value="title-asc"><i class="fas fa-sort-alpha-down me-1"></i> Title A-Z</option>
@@ -105,9 +108,9 @@
         </div>
     </div>
 
-    <!-- Watchlist Movies -->
-    <div class="row" id="watchlistGrid">
-        {% for item in watchlist %}
+    <!--Actual Liked List-->
+    <div class="row" id="likelistGrid">
+        {% for item in likelist %}
         <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4 watchlist-item" data-title="{{ item.movie.title|lower }}"
             data-date="{{ item.timestamp|date:'YmdHis' }}"
             data-genres="{% for genre in item.movie.genres %}{{ genre.id }},{% endfor %}"
@@ -156,18 +159,14 @@
     </div>
     {% else %}
     <div class="empty-watchlist">
-        <h3>Your watchlist is empty</h3>
-        <p>Start exploring movies to add them to your watchlist</p>
+        <h3>Your Liked Movies list is empty</h3>
+        <p>Start exploring movies to add them to your Liked Movies</p>
         <a href="{% url 'home' %}" class="btn btn-primary">
             <i class="fas fa-film"></i> Discover Movies
         </a>
     </div>
     {% endif %}
-</div>
-
-
-
-
+    
 
 </div>
 {% endblock %}
@@ -282,6 +281,7 @@
         });
 
 
+        
 
         
     });
