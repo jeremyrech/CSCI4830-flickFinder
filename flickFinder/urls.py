@@ -26,5 +26,8 @@ urlpatterns = [
     # Watchlist page, displays user's watchlist
     path('watchlist/', views.watchlist, name='watchlist'),
 
+    # LikeList page, pathed via watchlist
+    path('likelist/', views.likelist, name='likelist')
+
     # logout included in django auth
 ]
