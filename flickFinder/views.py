@@ -760,21 +760,21 @@ def unwatchlist(request):
     try:
         movie = get_object_or_404(Movie, tmdb_id=movie_id) # Ensure movie exists
 
-        
-
-        interactionOBJ = UserMovieInteraction.objects.filter(
+    
+        UserMovieInteraction.objects.filter(
             Q(interaction_type='watchlist') | Q(interaction_type='heart'),
             user=request.user,
             movie=movie,    
+        ).delete()
+
+         # This may be redundant, but fixes uniqueness conflict which crashed the page
+        UserMovieInteraction.objects.update_or_create(
+            user=request.user,
+            movie=movie,
+            interaction_type='skip',
+            defaults={'timestamp': timezone.now()}
         )
 
-        for interact in interactionOBJ:
-            interact.delete()
-
-        # Set interaction type to skip and save
-        # interaction.interaction_type = 'skip' # Change type
-        # interaction.timestamp = timezone.now() # Update timestamp
-        # interaction.save()
 
 
 
