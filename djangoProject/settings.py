@@ -123,6 +123,7 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'flickFinder' / 'static',
 ]
+STATIC_ROOT = BASE_DIR / "static/"
 
 # Media files settings
 #MEDIA_URL = '/media/'
