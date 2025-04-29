@@ -9,3 +9,4 @@ wait
 echo Activated virtual environment.
 echo Installing requirements...
 python3 -m pip install -r requirements.txt
+sudo apt install nginx
