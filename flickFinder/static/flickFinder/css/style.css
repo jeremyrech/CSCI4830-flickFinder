@@ -132,3 +132,17 @@ html, body {
         padding-right: 20px;
     }
 }
+
+/* Navbar search form */
+#navbarSearchForm {
+    min-width: 250px;
+    max-width: 400px;
+}
+
+/* Search results page */
+.search-movie-card {
+    transition: transform 0.2s;
+}
+.search-movie-card:hover {
+    transform: translateY(-5px);
+}
