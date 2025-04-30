@@ -30,4 +30,6 @@ urlpatterns = [
     path('likelist/', views.likelist, name='likelist')
 
     # logout included in django auth
+
+    path('search/', views.search_movies, name='search_movies'),
 ]
