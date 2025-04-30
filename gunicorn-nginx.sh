@@ -1,12 +1,14 @@
 #!/bin/bash
-set -e  # exit on error
-
 USER_NAME=$(whoami)
 IP=$(curl -s ifconfig.me)
 DIR_WORKSPACE=CSCI4830-flickFinder
 
-### configure gunicorn ###
-# create gunicorn socket
+# Enter directory and activate virtual environment
+cd $HOME/$DIR_WORKSPACE
+source web_environment/bin/activate
+
+### Configure Gunicorn ###
+# Create Gunicorn socket
 sudo tee /etc/systemd/system/gunicorn.socket > /dev/null << EOF
 [Unit]
 Description=Python and Django
@@ -18,7 +20,7 @@ ListenStream=/run/gunicorn.sock
 WantedBy=sockets.target
 EOF
 
-# configure gunicorn service
+# Configure Gunicorn service
 sudo tee /etc/systemd/system/gunicorn.service > /dev/null << EOF
 [Unit]
 Description=gunicorn daemon
@@ -39,20 +41,18 @@ ExecStart=/home/$USER_NAME/$DIR_WORKSPACE/web_environment/bin/gunicorn \
 WantedBy=multi-user.target
 EOF
 
-# enable and start Gunicorn:
+# Enable and start Gunicorn:
 sudo systemctl start gunicorn.socket
 sudo systemctl enable gunicorn.socket
 sudo systemctl daemon-reload
 sudo systemctl restart gunicorn
 sudo systemctl enable gunicorn
-sudo systemctl status gunicorn.service
-
-
-
-
 
 ### Configuring Nginx ###
-# create Nginx config
+# Install Nginx
+sudo apt install nginx
+
+# Create Nginx config
 sudo tee /etc/nginx/sites-available/djangoProject > /dev/null << EOF
 server {
     listen 80;
@@ -70,17 +70,17 @@ server {
 }
 EOF
 
-# Run collectstatic to Gather Static Files
+# Run collectstatic to gather static files
 python manage.py collectstatic --noinput
 
-# Update File Permission
-cd /home/$USER_NAME/$DIR_WORKSPACE/static/
+# Update file permissions
+cd /home/$USER_NAME/$DIR_WORKSPACE
 sudo chmod +x ~/
-sudo find . -type d -exec chmod 755 {} \;
-sudo find . -type f -exec chmod 644 {} \;
-sudo chown -R www-data:www-data .
+sudo find static/ -type d -exec chmod 755 {} \;
+sudo find static/ -type f -exec chmod 644 {} \;
+sudo chown -R www-data:www-data static/
 
-# enable Nginix config
+# Enable Nginix config
 sudo ln -s /etc/nginx/sites-available/djangoProject /etc/nginx/sites-enabled/
 
 # Test and restart Nginx
