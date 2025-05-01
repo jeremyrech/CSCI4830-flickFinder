@@ -210,14 +210,14 @@ class TestTestWishlist(TestCase):
 
 
 
-class TestTestDetails():
-    def setup_method(self, method):
+class TestTestDetails(TestCase):
+    def setUp(self):
         self.driver = webdriver.Firefox()
         self.vars = {}
 
         self.wait = WebDriverWait(self.driver, 15)
         self.driver.set_window_size(1440, 900)
-    def teardown_method(self, method):
+    def tearDown(self):
         self.driver.quit()
 
     def test_testDetails(self):
