@@ -13,8 +13,9 @@
         <div class="col-md-4 mb-4">
             <div class="card h-100">
                 <a href="{% url 'movie_detail' movie.id %}">
-                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
-                         class="card-img-top" alt="{{ movie.title }}">
+                    <img src="{% if movie.poster_path %}https://image.tmdb.org/t/p/w500{{ movie.poster_path }}{% else %}{% static 'flickFinder/images/no-poster.jpg' %}{% endif %}" 
+                         class="card-img-top" alt="{{ movie.title }}"
+                         {% if not movie.poster_path %}style="object-fit: contain; background-color: #eee; height: 450px;"{% endif %}>
                 </a>
                 <div class="card-body">
                     <h5 class="card-title">{{ movie.title }}</h5>

@@ -118,8 +118,9 @@
             <div class="card movie-card h-100">
                 <div class="poster-container position-relative">
                     <a href="{% url 'movie_detail' item.movie.tmdb_id %}">
-                        <img src="https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}"
-                            alt="{{ item.movie.title }}" class="movie-poster">
+                        <img src="{% if item.movie.poster_path %}https://image.tmdb.org/t/p/w500{{ item.movie.poster_path }}{% else %}{% static 'flickFinder/images/no-poster.jpg' %}{% endif %}"
+                            alt="{{ item.movie.title }}" class="movie-poster"
+                            {% if not item.movie.poster_path %}style="object-fit: contain; background-color: #eee;"{% endif %}>
                     </a>
                     {% if item.movie.vote_average %}
                     <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2">

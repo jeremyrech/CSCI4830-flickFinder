@@ -27,7 +27,7 @@
             
             <div id="movieContainer" class="movie-card">
                 <a href="{% url 'movie_detail' movie.id %}" class="poster-link">
-                    <img src="https://image.tmdb.org/t/p/w500{{ movie.poster_path }}" 
+                    <img src="{% if movie.poster_path %}https://image.tmdb.org/t/p/w500{{ movie.poster_path }}{% else %}{% static 'flickFinder/images/no-poster.jpg' %}{% endif %}" 
                          alt="{{ movie.title }}" class="movie-poster" draggable="false">
                 </a>
                 <div class="movie-info">

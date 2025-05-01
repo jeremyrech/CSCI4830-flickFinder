@@ -18,8 +18,9 @@
     <div class="row">
         <!-- Movie Poster -->
         <div class="col-md-4 movie-poster-container">
-            <img src="https://image.tmdb.org/t/p/w500{{ movie_data.poster_path }}" 
-                 alt="{{ movie_data.title }}" class="movie-poster">
+            <img src="{% if movie_data.poster_path %}https://image.tmdb.org/t/p/w500{{ movie_data.poster_path }}{% else %}{% static 'flickFinder/images/no-poster.jpg' %}{% endif %}" 
+                 alt="{{ movie_data.title }}" class="movie-poster"
+                 {% if not movie_data.poster_path %}style="object-fit: contain; background-color: #eee;"{% endif %}>
                  
             <!-- Movie Actions (only shown for authenticated users) -->
             {% if user.is_authenticated %}
