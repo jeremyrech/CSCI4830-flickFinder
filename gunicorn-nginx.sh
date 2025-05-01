@@ -7,6 +7,12 @@ DIR_WORKSPACE=CSCI4830-flickFinder
 cd $HOME/$DIR_WORKSPACE
 source web_environment/bin/activate
 
+# Disable debug mode
+sed -i "s|DEBUG = True|DEBUG = False|g" djangoProject/settings.py
+
+# Auto-populate allowed hosts section
+sed -i "s/[ALLOWED_HOSTS = [^a-zA-Z0-9]]/['$IP']/g" djangoProject/settings.py
+
 ### Configure Gunicorn ###
 # Create Gunicorn socket
 sudo tee /etc/systemd/system/gunicorn.socket > /dev/null << EOF
