@@ -11,7 +11,7 @@ source web_environment/bin/activate
 sed -i "s|DEBUG = True|DEBUG = False|g" djangoProject/settings.py
 
 # Auto-populate allowed hosts section
-sed -i "s/[ALLOWED_HOSTS = [^a-zA-Z0-9]]/['$IP']/g" djangoProject/settings.py
+sed -i "s|DUMMY_ALLOWED_HOST|$IP|g" djangoProject/settings.py
 
 ### Configure Gunicorn ###
 # Create Gunicorn socket
