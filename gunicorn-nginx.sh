@@ -79,6 +79,10 @@ EOF
 # Run collectstatic to gather static files
 python manage.py collectstatic --noinput
 
+# Run migrations
+python3 manage.py makemigrations
+python3 manage.py migrate
+
 # Update file permissions
 cd /home/$USER_NAME/$DIR_WORKSPACE
 sudo chmod +x ~/
