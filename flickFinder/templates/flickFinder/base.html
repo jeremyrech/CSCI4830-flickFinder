@@ -82,62 +82,8 @@
     crossorigin="anonymous"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
     crossorigin="anonymous"></script>
-    {% block extra_js %}{% endblock %}
+    <script src="{% static 'flickFinder/js/main.js' %}"></script> 
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Navbar search functionality
-            const searchForm = document.getElementById('navbarSearchForm');
-            if (searchForm) {
-                searchForm.addEventListener('submit', function(e) {
-                    const searchInput = this.querySelector('input[name="query"]');
-                    if (!searchInput.value.trim()) {
-                        e.preventDefault();
-                        // You can add visual feedback here
-                        searchInput.classList.add('is-invalid');
-                        setTimeout(() => searchInput.classList.remove('is-invalid'), 2000);
-                    }
-                });
-            }
-    
-            // Optional: Auto-focus search input when dropdown is shown
-            const navbarToggler = document.querySelector('.navbar-toggler');
-            if (navbarToggler) {
-                navbarToggler.addEventListener('click', function() {
-                    setTimeout(() => {
-                        const searchInput = document.querySelector('#navbarSearchForm input');
-                        if (searchInput && window.getComputedStyle(navbarToggler).display !== 'none') {
-                            searchInput.focus();
-                        }
-                    }, 300);
-                });
-            }
-    
-            // Optional: Add debounced search suggestions
-            let searchTimeout;
-            const searchInput = document.querySelector('#navbarSearchForm input[name="query"]');
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    clearTimeout(searchTimeout);
-                    if (this.value.length > 2) {
-                        searchTimeout = setTimeout(() => {
-                            fetchSuggestions(this.value);
-                        }, 300);
-                    }
-                });
-            }
-    
-            async function fetchSuggestions(query) {
-                try {
-                    const response = await fetch(`/search/suggestions/?q=${encodeURIComponent(query)}`);
-                    const data = await response.json();
-                    // Implement your suggestion display logic here
-                    console.log('Suggestions:', data);
-                } catch (error) {
-                    console.error('Error fetching suggestions:', error);
-                }
-            }
-        });
-        </script>
-</body>
+    {% block extra_js %}{% endblock %}
+    </body>
 </html>
